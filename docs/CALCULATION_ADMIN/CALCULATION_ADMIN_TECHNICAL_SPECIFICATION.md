@@ -173,11 +173,11 @@ flowchart TB
 | Поле | Содержание |
 |---|---|
 | Назначение | Управление геометрическими константами и ограничениями. |
-| Функциональность | Редактирование `KITCHEN_LIMITS` (17 полей), `WARDROBE_LIMITS` (17 полей), геометрических частей `SINK_RULES` (`minWidth/maxWidth/widthStep/standardWidths/mountEdge/innerMount/sinkStep/min-maxSinkWidth/Depth`), допусков опор (`MIN_LEG_SPACING_CM=8`, `PARTITION_SNAP_CM=4`, `MERGE_TOLERANCE_CM=1.5`), `LED_END_MARGIN_CM=2`. |
+| Функциональность | Редактирование `KITCHEN_LIMITS` (**15 полей** — **[ФАКТ]** `src/content/catalog.ts:476–492`, поля 477–491; заявленные ранее «17 полей» — источник числа не найден, вопрос состава не закрыт), `WARDROBE_LIMITS` (17 полей), геометрических частей `SINK_RULES` (`minWidth/maxWidth/widthStep/standardWidths/mountEdge/innerMount/sinkStep/min-maxSinkWidth/Depth`), допусков опор (`MIN_LEG_SPACING_CM=8`, `PARTITION_SNAP_CM=4`, `MERGE_TOLERANCE_CM=1.5`), `LED_END_MARGIN_CM=2`. |
 | Входные данные | Числовые/списочные значения, `AdminParameter`. |
 | Выходные данные | Версия параметров + запись `AdminAuditLog`. |
 | Операции администратора | Просмотр, редактирование с валидацией, откат. |
-| Ограничения | **[АУДИТ]** Запрещено выносить до устранения дублей: `EDGE_GAP/NEIGHBOR_GAP/DOOR_GAP` в `KitchenScene.tsx` (дубли `facadeEdgeGap/facadeNeighborGap/facadeInnerGap`), толщина 1.6 (дубли в `KitchenScene.tsx`/`WardrobeScene.tsx`), `bottleClearOffset` (дубль литерала `-32` в `KitchenPanel.tsx`), диапазоны 80/95/200 (литералы в `KitchenPanel.tsx`), `MIN_FLOOR_Y`, `MARGIN`. Zod-границы в `schema.ts` (width 15–200, height 40–280 и др.) должны синхронизироваться с редактируемыми значениями. |
+| Ограничения | **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, Q6): редактирование геометрических параметров временно запрещено до устранения дублей и проверки зависимостей; ограничение касается **только редактирования геометрии** — прочие параметры и функции Calculation Admin не ограничиваются; ADR-04 оформляется отдельно. **[АУДИТ]** Запрещено выносить до устранения дублей: `EDGE_GAP/NEIGHBOR_GAP/DOOR_GAP` в `KitchenScene.tsx` (дубли `facadeEdgeGap/facadeNeighborGap/facadeInnerGap`), толщина 1.6 (дубли в `KitchenScene.tsx`/`WardrobeScene.tsx`), `bottleClearOffset` (дубль литерала `-32` в `KitchenPanel.tsx`), диапазоны 80/95/200 (литералы в `KitchenPanel.tsx`), `MIN_FLOOR_Y`, `MARGIN`. Zod-границы в `schema.ts` (width 15–200, height 40–280 и др.) должны синхронизироваться с редактируемыми значениями. |
 | Зависимости | 03 (пресеты), 07 (формулы), 10 (валидация). |
 | Критерии готовности | Изменение параметра проходит валидацию и попадает в `AdminParameter`; мёртвые параметры не отображаются как действующие (**[АУДИТ]** `KITCHEN_LIMITS.minCountertopMeters` не читается нигде). |
 
@@ -242,7 +242,7 @@ flowchart TB
 | Входные данные | `PriceItem`, `PricingVersion`. |
 | Выходные данные | Опубликованная версия прайса + `PricingChange` + `AdminAuditLog`; запуск пересчёта (раздел 05 настоящего ТЗ). |
 | Операции администратора | Редактирование цен → валидация → создание версии → публикация (с подтверждением) → инициация пересчёта. |
-| Ограничения | **[АУДИТ]** Не отображать как действующие настройки 4 мёртвых поля: `PRICING.kitchen.plinthPerMeter`, `sinkPartition`, `underCabinetLightPerMeter`, `countertopDepthAllowance` — они не влияют на расчёт (**[ФАКТ]** подтверждено чтением `calculateKitchenPrice`). Публикация запрещена при ошибках валидации. |
+| Ограничения | **[АУДИТ]** Не отображать как действующие настройки 4 мёртвых поля: `PRICING.kitchen.plinthPerMeter`, `sinkPartition`, `underCabinetLightPerMeter`, `countertopDepthAllowance` — они не влияют на расчёт (**[ФАКТ]** подтверждено чтением `calculateKitchenPrice`). **[ФАКТ]** (CA-T-002/CA-T-007): эти 4 поля физически остаются в `src/content/pricing.ts:26, 27, 29, 33` и не читаются `calculateKitchenPrice`; `PRICING.wardrobe.plinthPerMeter` при этом используется (`src/lib/configurator/pricing.ts:492`); удаление полей относится к Q12 / Этапу 0 (поля из кода не удалялись, Q12 не закрыт). Публикация запрещена при ошибках валидации. |
 | Зависимости | 02–05 (источники ставок), 08 (пересчёт), 09 (версии). |
 | Критерии готовности | Публикация создаёт `PricingVersion`; изменение цены без деплоя отражается в `calculatePrice`; история изменений записана. |
 
@@ -320,7 +320,7 @@ flowchart TB
 | `valueType` | enum(`number`,`int`,`boolean`,`enum`,`string[]`) | да | Тип для валидации UI. |
 | `unit` | string \| null | нет | Ед. изм. (см, мм, ₽/м², —). |
 | `min` / `max` | number \| null | нет | Границы (должны быть ≤ zod-границ — см. 3.3). |
-| `status` | enum(`active`,`dead`,`preliminary`,`readonly`) | да | `dead` — не влияет на расчёт (**[АУДИТ]** 4 поля), `preliminary` — не подтверждён. |
+| `status` | enum(`active`,`dead`,`preliminary`,`readonly`,`pending_release`) | да | `dead` — не влияет на расчёт (**[АУДИТ]** 4 поля), `preliminary` — не подтверждён. **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, PEND-01; дизайн §5.7/§6.1): `pending_release` — правка параметра, читаемого расчётным движком, принята, но **не влияет на расчёты до выпуска новой версии `calcVersion`**; после выпуска новой версии становится `active`. Оператор видит, что изменение принято, но ещё не действует. Переход `pending_release → active` выполняется только релизом `calcVersion` с записью в `AdminAuditLog`. Механизм не реализован. |
 | `sourceRef` | string | да | Файл:константа, например `src/content/catalog.ts:KITCHEN_LIMITS`. |
 | `version` | string | да | Версия значения (связь с `schemaVersion`). |
 | `updatedAt` / `updatedBy` | timestamp / string | да | Метаданные изменения. |
@@ -333,7 +333,7 @@ flowchart TB
 | Поле | Тип | Обяз. | Описание |
 |---|---|---|---|
 | `id` | string | да | Идентификатор из справочника (не переименовывать). |
-| `catalog` | enum(`bodyMaterial`,`facadeMaterial`,`facadeStyle`,`handle`,`countertop`,`plinthMaterial`,`plinthFinish`,`plinthMount`,`supportSystem`,`ledStrip`,`ledProfile`,`ledDiffuser`,`ledControl`,`psu`,`sinkSize`,`promo`) | да | Исходный справочник. |
+| `catalog` | enum(`bodyMaterial`,`facadeMaterial`,`facadeStyle`,`handle`,`countertop`,`plinthMaterial`,`plinthFinish`,`plinthMount`,`supportSystem`,`ledStrip`,`ledProfile`,`ledDiffuser`,`ledControl`,`ledPsu`,`sinkSize`,`promo`) | да | Исходный справочник (**[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** CA-T-004: `psu` → `ledPsu` согласно дизайну §6.2). |
 | `label` | string | да | Отображаемое название. |
 | `attrs` | object | да | Справочные атрибуты (ставки, множители, толщины, `rateDelta`, `finishes`…). |
 | `status` | enum(`active`,`archived`,`preliminary`) | да | Статус. |
@@ -367,12 +367,12 @@ flowchart TB
 | `id` | string | да | Стабильный ключ ставки (напр. `kitchen.hingePerDoor`). |
 | `scope` | enum(`kitchen`,`wardrobe`,`shared`) | да | Область. |
 | `label` | string | да | Название. |
-| `amount` | number | да | Значение (₽, ₽/м², ₽/м, множитель). |
 | `unit` | enum(`RUB`,`RUB_PER_SQM`,`RUB_PER_M`,`RUB_PER_PCS`,`RUB_PER_LINM`,`FACTOR`) | да | Ед. изм. |
 | `usage` | enum(`used`,`unused`) | да | **[АУДИТ]** 4 поля имеют `unused` и не отображаются как настройки (требование 5.9). |
 | `sourceRef` | string | да | `src/content/pricing.ts:PRICING.kitchen.shelf` и т.п. |
-| `versionId` | string | да | Версия прайса, в которой действует. |
 | `updatedAt` / `updatedBy` | — | да | Метаданные. |
+
+**[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, X-3; дизайн §6.4): поле `amount` в определении ставки отсутствует — сумма хранится в снимке версии `PricingVersion.snapshot[]` (`{priceItemId, amount}`); поле `versionId` исключено — версия является атрибутом `PricingVersion`, а не ставки.
 
 Связи: N:1 → `PricingVersion`; 1:N → `PricingChange`.
 
@@ -383,7 +383,9 @@ flowchart TB
 | `id` | string | да | Идентификатор версии (**[ПРЕДПОЛОЖЕНИЕ]** `price-YYYY.MM.N`). |
 | `label` | string | да | Название (напр. `demo-2026-01` — **[ФАКТ]** текущее значение `PRICING.version`). |
 | `status` | enum(`draft`,`published`,`superseded`) | да | Статус жизненного цикла. |
-| `items` | PriceItem[] | да | Полный снимок ставок (снимок, не ссылки — для воспроизводимости). |
+| `snapshot` | array[{priceItemId, amount}] | да | **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, X-2; дизайн §6.5) полный снимок ставок — `{priceItemId, amount}`, снимок, не ссылки (для воспроизводимости); заменяет поле `items: PriceItem[]`. |
+| `rules` | object | да | Коммерческие правила снимком (`rounding`, `minOrder`, `complexityPerExtraModule`, `complexityMax`, `bodyFactor`, `bodyDepthReference`, …). |
+| `promos` | array | да | Промокоды снимком. |
 | `createdAt` / `createdBy` | — | да | Метаданные. |
 | `publishedAt` / `publishedBy` | — | при `published` | Метаданные публикации. |
 | `notes` | string | нет | Комментарий. |
@@ -437,14 +439,14 @@ flowchart TB
 | `projectId` | string | да | Проект (`StoredProject.id`). |
 | `priceVersionId` | string | да | Версия прайса для пересчёта. |
 | `calcVersion` | string | да | Версия движка на момент пересчёта. |
-| `status` | enum(`pending`,`running`,`succeeded`,`failed`,`cancelled`) | да | Статус. |
+| `status` | enum(`pending`,`running`,`completed`,`failed`,`cancelled`) | да | Статус (**[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** CA-T-004, X-1: `succeeded` → `completed` согласно дизайну §6.9/§14.4). |
 | `attempt` | int | да | Номер попытки. |
 | `oldPrice` / `newPrice` | number | да | До/после. |
 | `error` | string \| null | при `failed` | Текст ошибки. |
 | `startedAt` / `finishedAt` | timestamp | нет | Тайминги. |
 | `createdAt` / `createdBy` | — | да | Метаданные. |
 
-Ограничения: уникальность (`projectId`, `priceVersionId`) — идемпотентность (раздел 05).
+Ограничения: **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, X-4; дизайн §6.9) идемпотентность — U(`projectId`, `toPriceVersionId`, `operationId`) в пределах операции. Примечание: `toPriceVersionId`/`operationId` вводятся вместе с `RecalculationBatch` (дизайн §6.13) — в настоящей модели `priceVersionId` и сущность батча отсутствуют (см. остаточные несогласованности отчёта CA-T-007).
 
 ### ProjectPriceHistory
 
@@ -457,7 +459,7 @@ flowchart TB
 | `price` | number | да | Итоговая стоимость после расчёта. |
 | `breakdown` | json | нет | Снимок `PriceBreakdown` (**[ПРЕДПОЛОЖЕНИЕ]** — утвердить, влияет на объём). |
 | `computedAt` | timestamp | да | Момент расчёта. |
-| `recalculationId` | string | да | Связь с заданием. |
+| `jobId` | string | да | Связь с заданием (`ProjectRecalculation.id`) — **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** CA-T-004, X-5: `recalculationId` → `jobId` согласно дизайну §6.10. |
 
 Ограничения: append-only; удаление только по регламенту retention (**[ВОПРОС]**).
 
@@ -470,6 +472,7 @@ flowchart TB
 | `entityType` / `entityId` | enum / string | да | Объект. |
 | `oldValue` / `newValue` | json \| null | нет | Снимки до/после. |
 | `actorId` / `actorRole` | string / enum | да | Кто выполнил. |
+| `result` | enum(`ok`,`denied`,`error`) | да | **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** CA-T-004, X-7 (дизайн §6.11): итог действия, включая отказы прав. |
 | `requestId` | string | нет | Трассировка. |
 | `createdAt` | timestamp | да | Когда. |
 
@@ -505,6 +508,8 @@ erDiagram
     AdminAuditLog }o--|| PricingVersion : "журнал публикации"
     ValidationResult }o--|| PricingVersion : "проверка перед публикацией"
 ```
+
+**Подпись к ERD:** Логическая модель. Физических FK нет (JSON-хранилище); целостность обеспечивается валидацией при записи и сверкой (§6.8, п. 7).
 
 ## 3.4. Правила хранения
 
@@ -584,7 +589,7 @@ sequenceDiagram
 | Ситуация | Поведение |
 |---|---|
 | У проекта нет `priceVersion` | Трактовать как первый известный прайс (`demo-2026-01`); при пересчёте записать историю с фактической версией. |
-| Нет `calcVersion` | Взять версию текущей сборки; пометить запись как «версия неизвестна» в истории. |
+| Нет `calcVersion` | **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, CA-Q-001; дизайн §5.7): молчаливая подмена старого движка новым **запрещена**; автоматический пересчёт **блокируется** до штатного перехода; первое определение версии — только контролируемая операция (`retro_certification`/`engine_migration`) с записью в историю (`prevCalcVersion`). Физический механизм хранения сборок и глубина хранения определяются отдельно (ADR-03). |
 | Нет `schemaVersion` | `= 1` (**[ФАКТ]** соответствует существующему `config.version = 1`). |
 | Опубликованной версии прайса нет | Пересчёт невозможен; панель показывает статус «нет активного прайса». |
 
@@ -593,7 +598,8 @@ sequenceDiagram
 1. Публикация версии атомарна: либо `published` + запуск пересчёта, либо откат.
 2. Записи истории append-only.
 3. **[ФАКТ]** Риск: `docker-compose.yml` не содержит volume для `/app/data` — пересоздание контейнера теряет `data/*.json`. Устранение — отдельная задача/ADR (раздел 11, T-0.3; раздел 12).
-4. **[ФАКТ]** `store.ts` хранит максимум 2000 последних проектов (`slice(-2000)`) — лимит нужно учитывать при массовом пересчёте (**[ВОПРОС]**).
+4. **[ФАКТ]** `store.ts` хранит максимум 2000 последних проектов (`slice(-2000)`, `src/lib/server/projects.ts:48`): при достижении лимита **старейший проект удаляется молча** — без архива, журнала и диагностики; 2001-й проект не сохраняется (проверено CA-T-002/CA-T-007). Лимит нужно учитывать при массовом пересчёте.
+   **[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, Q14 — утверждено владельцем 2026-11-06; **не реализовано**): основная коллекция содержит максимум 2000 проектов; при вытеснении старые проекты **архивируются**; финансовая история и история пересчётов сохраняются; безвозвратное автоматическое удаление запрещено; физическая модель архива определяется отдельно в ADR-01.
 
 ---
 
@@ -658,8 +664,16 @@ sequenceDiagram
 
 ## 5.4. Связь с существующим поведением
 
-**[ФАКТ]** Сегодня `getProject` (`src/lib/server/projects.ts`) при выдаче проекта пересчитывает цену по текущему прайсу. Это входит в противоречие с требованием хранить историю: реализация раздела 05 обязана заменить/ограничить это поведение так, чтобы источником истории была `ProjectPriceHistory`, а не пересчёт при чтении.
-**Изменение `getProject` — задача Т-05.x и требует отдельного согласования** (это изменение существующего API — **[ВОПРОС]**, раздел 12).
+**[ФАКТ]** (проверено CA-T-002/CA-T-007 по коду, 2026-11-06): `getProject` (`src/lib/server/projects.ts:60–72`) при выдаче проекта пересчитывает цену по текущему прайсу (пересчёт — строка 70); сохранённый `StoredProject.price` и `updatedAt` при этом **не обновляются**; проект, не прошедший текущий `validateConfig`, превращается в `null` (строка 65) и возвращает 404 (`src/app/api/projects/[id]/route.ts:23–28`). Это входит в противоречие с требованием хранить историю: источником истории должна быть `ProjectPriceHistory`, а не пересчёт при чтении.
+
+**[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** (CA-T-004, Q5 — утверждено владельцем 2026-11-06; реализация — T-4.5/CA-T-413, **ещё не реализована**):
+- GET возвращает сохранённый снимок стоимости проекта;
+- GET не запускает пересчёт и не изменяет проект;
+- пересчёт выполняется отдельной операцией;
+- результат пересчёта сохраняется в проекте;
+- история пересчётов хранится отдельно.
+
+Согласование поведения `getProject` получено в рамках CA-T-004 (Q5); изменение существующего API выполняется задачей T-4.5.
 
 ---
 
