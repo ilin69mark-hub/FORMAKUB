@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FORMAKUB — «куб» как куб · 26 концептов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Prata&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#161310; --ink-2:#2a2520; --cream:#f3eee5; --cream-2:#e8dfd2; --sand:#d6c6b1;
+    --copper:#b87849; --copper-2:#e1a570; --copper-3:#8f5a34; --olive:#6f755f;
+    --serif:"Prata",Georgia,"Times New Roman",serif;
+    --sans:"Manrope",system-ui,-apple-system,sans-serif;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--cream);scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--ink);line-height:1.55;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 700px at 88% -8%, rgba(225,165,112,.20), transparent 58%),
+      radial-gradient(900px 600px at -8% 18%, rgba(214,198,177,.42), transparent 62%),
+      var(--cream);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .wrap{width:min(100% - clamp(1.5rem,5vw,6rem), 96rem);margin-inline:auto;position:relative;z-index:1}
+
+  /* ---------- header ---------- */
+  .top{padding:clamp(3rem,7vw,6rem) 0 clamp(1.5rem,3vw,2.5rem)}
+  .eyebrow{display:inline-flex;align-items:center;gap:.6rem;font-size:.68rem;font-weight:700;
+    letter-spacing:.2em;text-transform:uppercase;color:rgba(22,19,16,.6)}
+  .eyebrow::before{content:"";width:2rem;height:1px;background:var(--copper)}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.4rem,6vw,4.8rem);
+    line-height:.98;letter-spacing:-.035em;margin:1.1rem 0 0}
+  h1 em{font-style:italic;color:var(--copper)}
+  .lead{max-width:44rem;margin:1.3rem 0 0;font-size:1rem;color:rgba(22,19,16,.65)}
+  .legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:1.8rem;font-size:.72rem;color:rgba(22,19,16,.5)}
+  .legend b{color:var(--copper);font-weight:700;margin-right:.3rem}
+
+  /* ---------- grid / cards ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr));
+    gap:1.15rem;padding:clamp(1rem,2vw,2rem) 0 4rem}
+  .card{position:relative;display:flex;flex-direction:column;min-height:23rem;
+    padding:1.15rem 1.15rem 1.3rem;background:rgba(255,255,255,.52);
+    border:1px solid rgba(22,19,16,.1);border-radius:1.4rem;
+    box-shadow:0 24px 60px -46px rgba(22,19,16,.55);overflow:hidden;
+    transition:transform .5s var(--ease), box-shadow .5s var(--ease), border-color .5s var(--ease)}
+  .card:hover{transform:translateY(-4px);box-shadow:0 34px 70px -44px rgba(22,19,16,.5);
+    border-color:rgba(184,120,73,.4)}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.35rem}
+  .num{font-family:var(--serif);font-size:1.45rem;line-height:1;color:var(--copper)}
+  .tag{font-size:.56rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(22,19,16,.45);border:1px solid rgba(22,19,16,.12);border-radius:999px;
+    padding:.3rem .55rem;background:rgba(255,255,255,.4)}
+  .stage{position:relative;flex:1;display:grid;place-items:center;min-height:13.5rem;
+    padding:1.6rem 1rem;border-radius:1rem;overflow:hidden}
+  .stage.soft{background:linear-gradient(180deg, rgba(232,223,210,.55), rgba(232,223,210,.15))}
+  .stage.dark{background:radial-gradient(120% 120% at 50% 0%, #26201a, #100e0c 72%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .card h3{font-size:.95rem;font-weight:700;letter-spacing:-.01em;margin:.95rem 0 0}
+  .card p{font-size:.76rem;line-height:1.55;color:rgba(22,19,16,.52);margin:.3rem 0 0}
+
+  /* ---------- wordmarks ---------- */
+  .wm{display:inline-flex;align-items:center;gap:.45rem;font-weight:800;letter-spacing:.17em;
+    font-size:1.02rem;white-space:nowrap}
+  .wm--lg{font-size:1.2rem}
+  .wm--light{color:var(--cream)}
+  .dot{width:.42em;height:.42em;border-radius:50%;background:var(--copper);display:inline-block;flex:none}
+  .dot--light{background:var(--copper-2)}
+
+  /* ---------- isometric ---------- */
+  .iso{display:block;width:100%;height:100%}
+  .iso .t{fill:var(--copper-2)}
+  .iso .l{fill:var(--copper)}
+  .iso .r{fill:var(--copper-3)}
+
+  .cube-word{position:relative;width:1.5em;height:1.5em;flex:none;display:inline-block;
+    filter:drop-shadow(0 8px 14px rgba(184,120,73,.35))}
+  .cube-word>svg{width:100%;height:100%}
+  .cube-word b{position:absolute;inset:0;display:grid;place-items:center;font-size:.44em;
+    letter-spacing:.09em;color:rgba(243,238,229,.96);font-weight:800;transform:translateY(8%)}
+
+  .mini-cube{width:.72em;height:.72em;flex:none;display:inline-block;
+    background:conic-gradient(from 30deg,var(--copper-2),var(--copper) 40%,var(--copper-3) 75%,var(--copper-2));
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+    filter:drop-shadow(0 3px 4px rgba(184,120,73,.4))}
+  .u-cube{width:.94em;height:.94em;display:inline-block;flex:none;margin:0 .12em;
+    align-self:flex-end;transform:translateY(.04em)}
+
+  /* ---------- 04 monogram ---------- */
+  .monogram{width:5.6rem;height:5.6rem;border:1.5px solid var(--ink);border-radius:.45rem;
+    position:relative;display:grid;place-items:center;background:rgba(255,255,255,.25)}
+  .monogram .mf{font-family:var(--serif);font-size:2.7rem;line-height:1}
+  .monogram .mc{position:absolute;right:.45rem;bottom:.45rem;width:.7rem;height:.7rem;
+    background:var(--copper);box-shadow:0 0 0 2px rgba(243,238,229,.9)}
+  .mono-wrap{display:grid;place-items:center;gap:.1rem}
+  .mono-caption{margin-top:.8rem;font-size:.7rem;font-weight:800;letter-spacing:.34em;color:rgba(22,19,16,.8)}
+
+  /* ---------- 05 cabinet / 09 shelf ---------- */
+  .cabinet{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:6.6rem;height:6.6rem;
+    padding:3px;background:var(--ink);
+    box-shadow:10px 10px 0 -3px rgba(22,19,16,.16), 0 22px 30px -20px rgba(22,19,16,.5)}
+  .cabinet span{background:var(--cream-2);box-shadow:inset 0 0 0 1px rgba(22,19,16,.08)}
+  .cabinet span.on{background:var(--copper)}
+  .shelf{position:relative;width:6.2rem;height:6.2rem;border:2px solid var(--ink);
+    display:flex;flex-direction:column;background:rgba(255,255,255,.35);
+    box-shadow:10px 10px 0 -3px rgba(22,19,16,.15)}
+  .shelf span{flex:1;border-bottom:2px solid var(--ink)}
+  .shelf span:last-child{border-bottom:0}
+  .shelf span:nth-child(2){background:rgba(184,120,73,.18)}
+
+  /* ---------- 3D cube ---------- */
+  .scene{perspective:760px;display:grid;place-items:center}
+  .cube{--s:90px;position:relative;width:var(--s);height:var(--s);transform-style:preserve-3d;
+    animation:spinY 16s linear infinite}
+  .cube .face{position:absolute;inset:0;display:grid;place-items:center;
+    border:1px solid rgba(22,19,16,.18)}
+  .cube .f-front{transform:translateZ(calc(var(--s)/2));background:var(--copper)}
+  .cube .f-back{transform:rotateY(180deg) translateZ(calc(var(--s)/2));background:var(--copper)}
+  .cube .f-right{transform:rotateY(90deg) translateZ(calc(var(--s)/2));background:var(--copper-3)}
+  .cube .f-left{transform:rotateY(-90deg) translateZ(calc(var(--s)/2));background:var(--copper-3)}
+  .cube .f-top{transform:rotateX(90deg) translateZ(calc(var(--s)/2));background:var(--copper-2)}
+  .cube .f-bottom{transform:rotateX(-90deg) translateZ(calc(var(--s)/2));background:#6d4529}
+  @keyframes spinY{from{transform:rotateX(-24deg) rotateY(0)}to{transform:rotateX(-24deg) rotateY(360deg)}}
+
+  .cube--still{animation:none;transform:rotateX(-24deg) rotateY(-32deg)}
+  .cube--wire{animation-duration:22s}
+  .cube--wire .face{background:transparent!important;border:1.5px solid var(--copper)}
+  .cube--glass .face{background:rgba(255,255,255,.10)!important;
+    border:1px solid rgba(255,255,255,.35);
+    box-shadow:inset 0 0 24px rgba(225,165,112,.30);backdrop-filter:blur(2px)}
+  .cube--letters .face{background:var(--ink);color:var(--cream);font-family:var(--serif);font-size:1.55rem}
+  .cube--letters .f-front{background:var(--copper);color:var(--ink)}
+  .cube--letters .f-right{background:var(--copper-3)}
+  .cube--letters .f-left{background:var(--copper-3)}
+  .cube--letters .f-top{background:var(--copper-2);color:var(--ink)}
+
+  .cube--rubik{animation:none;transform:rotateX(-22deg) rotateY(-34deg)}
+  .cube--rubik .face{display:grid;grid-template-columns:repeat(3,1fr);
+    grid-template-rows:repeat(3,1fr);gap:2px;padding:4px;background:#151210;place-items:stretch}
+  .cube--rubik .face span{display:block;border-radius:2px}
+
+  .cube--holo .face{background:linear-gradient(135deg,#b87849,#6f755f,#e1a570,#d6c6b1);
+    background-size:300% 300%;animation:holo 6s ease infinite;opacity:.9;
+    border:1px solid rgba(255,255,255,.25)}
+  @keyframes holo{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+  .cube--neon .face{background:transparent;border:2px solid rgba(225,165,112,.9);
+    box-shadow:0 0 18px rgba(225,165,112,.55), inset 0 0 18px rgba(225,165,112,.22)}
+  .scene--neon{filter:drop-shadow(0 0 14px rgba(225,165,112,.45))}
+
+  .cube--explode{animation:none;transform:rotateX(-22deg) rotateY(-30deg)}
+  .cube--explode .face{transition:transform .55s var(--ease)}
+  @media (hover:hover){
+    .card:hover .cube--explode .f-front{transform:translateZ(calc(var(--s)*1.18))}
+    .card:hover .cube--explode .f-back{transform:rotateY(180deg) translateZ(calc(var(--s)*1.18))}
+    .card:hover .cube--explode .f-right{transform:rotateY(90deg) translateZ(calc(var(--s)*1.18))}
+    .card:hover .cube--explode .f-left{transform:rotateY(-90deg) translateZ(calc(var(--s)*1.18))}
+    .card:hover .cube--explode .f-top{transform:rotateX(90deg) translateZ(calc(var(--s)*1.18))}
+    .card:hover .cube--explode .f-bottom{transform:rotateX(-90deg) translateZ(calc(var(--s)*1.18))}
+  }
+
+  /* ---------- playful toys ---------- */
+  .toy{--s:88px;--c:var(--copper);width:var(--s);height:var(--s);background:var(--c);
+    border-radius:18px;position:relative;
+    box-shadow:-11px 11px 0 -3px #966036, 0 26px 36px -20px rgba(22,19,16,.55),
+      inset 0 2px 0 rgba(255,255,255,.28)}
+  .toy .eye{position:absolute;top:33%;width:14%;height:18%;background:#fff;border-radius:50%;
+    box-shadow:inset 0 -2px 3px rgba(0,0,0,.15)}
+  .toy .eye::after{content:"";position:absolute;left:30%;top:30%;width:45%;height:45%;
+    background:var(--ink);border-radius:50%}
+  .toy .eye.l{left:24%}
+  .toy .eye.r{right:24%}
+  .toy .mouth{position:absolute;left:50%;top:58%;width:34%;height:16%;
+    border-bottom:3px solid rgba(22,19,16,.75);border-radius:0 0 50% 50%;
+    transform:translateX(-50%)}
+
+  .toy--dice{border-radius:16px;background:var(--cream);
+    box-shadow:-10px 10px 0 -3px var(--sand), 0 24px 34px -20px rgba(22,19,16,.5),
+      inset 0 0 0 2px rgba(22,19,16,.1)}
+  .dice-grid{position:absolute;inset:16%;display:grid;grid-template-columns:repeat(3,1fr);
+    grid-template-rows:repeat(3,1fr);gap:6%}
+  .dice-grid i{background:var(--ink);border-radius:50%;width:72%;height:72%;place-self:center}
+
+  .toy--voxel{border-radius:0;background:#c9b99e;
+    box-shadow:10px 10px 0 -2px #9a8b74, 0 26px 30px -20px rgba(22,19,16,.5)}
+  .toy--voxel::before{content:"";position:absolute;inset:0 0 auto 0;height:27%;
+    background:var(--olive);box-shadow:inset 0 -3px 0 rgba(0,0,0,.16)}
+  .toy--voxel::after{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(rgba(0,0,0,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,.07) 1px, transparent 1px);
+    background-size:16px 16px}
+
+  .toy--googly{--c:var(--sand)}
+  .g-eye{position:absolute;top:27%;width:28%;height:30%;border-radius:50%;background:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.18)}
+  .g-eye.l{left:15%}
+  .g-eye.r{right:15%}
+  .g-eye i{position:absolute;left:32%;top:34%;width:42%;height:42%;background:var(--ink);border-radius:50%}
+  .g-eye.l i{animation:look 3.6s ease-in-out infinite}
+  .g-eye.r i{animation:look 3.6s ease-in-out infinite .25s}
+  @keyframes look{0%,100%{transform:translate(0,0)}30%{transform:translate(28%,-12%)}
+    62%{transform:translate(-18%,18%)}}
+  .blush{position:absolute;bottom:21%;width:16%;height:8%;background:rgba(210,110,100,.45);
+    border-radius:50%;filter:blur(1px)}
+  .blush.l{left:11%}
+  .blush.r{right:11%}
+
+  .emoji{font-size:5.4rem;line-height:1;filter:drop-shadow(0 18px 18px rgba(22,19,16,.18))}
+
+  .character{position:relative;width:11rem;height:10.5rem;display:grid;place-items:center}
+  .character .arm{position:absolute;top:46%;width:2.9rem;height:2px;background:var(--ink);border-radius:2px}
+  .character .arm.l{left:1.1rem;transform:rotate(20deg)}
+  .character .arm.r{right:1.1rem;transform:rotate(-20deg)}
+  .character .leg{position:absolute;bottom:.55rem;width:2px;height:2.1rem;background:var(--ink);border-radius:2px}
+  .character .leg.l{left:calc(50% - 1.1rem)}
+  .character .leg.r{left:calc(50% + 1.1rem)}
+
+  .shades{position:absolute;left:11%;right:11%;top:29%;height:23%;background:var(--ink);
+    border-radius:9px;display:flex;align-items:center;justify-content:space-between;padding:0 7%}
+  .shades::before,.shades::after{content:"";width:39%;height:64%;
+    background:linear-gradient(135deg,#3d3d3d,#0e0e0e);border-radius:6px;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.18)}
+  .smirk{position:absolute;left:37%;top:66%;width:26%;height:10%;
+    border-bottom:3px solid rgba(22,19,16,.8);border-radius:0 0 50% 50%;transform:rotate(-7deg)}
+
+  /* ---------- net ---------- */
+  .net{display:grid;grid-template-columns:repeat(4,2.5rem);grid-template-rows:repeat(3,2.5rem);gap:3px}
+  .net span{display:grid;place-items:center;background:var(--cream-2);
+    border:1px solid rgba(22,19,16,.18);font-family:var(--serif);font-size:1rem;color:var(--ink);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+  .net .n1{grid-column:2;grid-row:1}
+  .net .n2{grid-column:1;grid-row:2}
+  .net .n3{grid-column:2;grid-row:2;background:var(--copper);color:var(--cream)}
+  .net .n4{grid-column:3;grid-row:2}
+  .net .n5{grid-column:4;grid-row:2}
+  .net .n6{grid-column:2;grid-row:3}
+  .net .kub{font-family:var(--sans);font-size:.52rem;font-weight:800;letter-spacing:.12em}
+
+  /* ---------- glitch ---------- */
+  .glitch{position:relative;font-weight:800;letter-spacing:.18em;font-size:1.2rem;
+    color:var(--ink);user-select:none;white-space:nowrap}
+  .glitch span{position:absolute;inset:0;pointer-events:none}
+  .glitch .gc{color:#28c7c7;animation:glitchA 3.2s steps(3) infinite}
+  .glitch .gm{color:#c72a8f;animation:glitchB 3.2s steps(3) infinite}
+  @keyframes glitchA{0%,100%{clip-path:inset(0 0 62% 0);transform:translate(-3px,-1px)}
+    33%{clip-path:inset(58% 0 0 0);transform:translate(2px,1px)}
+    66%{clip-path:inset(28% 0 36% 0);transform:translate(-1px,0)}}
+  @keyframes glitchB{0%,100%{clip-path:inset(48% 0 12% 0);transform:translate(3px,1px)}
+    33%{clip-path:inset(8% 0 72% 0);transform:translate(-2px,-1px)}
+    66%{clip-path:inset(70% 0 0 0);transform:translate(1px,0)}}
+
+  /* ---------- liquid ---------- */
+  .liquid{width:7rem;height:7rem;
+    background:radial-gradient(circle at 32% 26%, var(--copper-2), var(--copper) 45%, var(--copper-3) 92%);
+    animation:morph 7s ease-in-out infinite;
+    box-shadow:0 26px 40px -22px rgba(143,90,52,.75), inset -8px -10px 18px rgba(0,0,0,.18)}
+  @keyframes morph{
+    0%,100%{border-radius:44% 56% 52% 48%/52% 44% 56% 48%;transform:rotate(0) scale(1)}
+    50%{border-radius:56% 44% 46% 54%/46% 56% 44% 54%;transform:rotate(8deg) scale(1.04)}}
+
+  /* ---------- nested ---------- */
+  .nest{position:relative;width:8.5rem;height:8.5rem}
+  .nest span{position:absolute;border:2px solid var(--copper);border-radius:.4rem;transform:rotate(45deg)}
+  .nest span:nth-child(1){inset:0}
+  .nest span:nth-child(2){inset:1.2rem;border-color:var(--ink);opacity:.7}
+  .nest span:nth-child(3){inset:2.4rem;border-color:var(--copper-2);background:rgba(225,165,112,.12)}
+
+  /* ---------- stacked lockup ---------- */
+  .stack{display:grid;place-items:center;gap:.45rem;text-align:center}
+  .stack .s1{font-weight:800;letter-spacing:.34em;font-size:.82rem;color:rgba(22,19,16,.72)}
+  .stack .s2{display:inline-flex;align-items:center;gap:.4rem;font-weight:800;letter-spacing:.22em;
+    font-size:1.5rem}
+  .stack .s2 .s-cube{width:1.45em;height:1.45em;display:inline-block;flex:none}
+  .stack .s3{font-size:.6rem;font-weight:600;letter-spacing:.28em;text-transform:uppercase;
+    color:rgba(22,19,16,.42)}
+
+  .hint{position:absolute;right:.8rem;bottom:.7rem;font-size:.55rem;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:rgba(22,19,16,.3)}
+
+  footer.foot{padding:0 0 4rem;color:rgba(22,19,16,.5);font-size:.78rem}
+  footer.foot b{color:var(--copper)}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <span class="eyebrow">FORMAKUB · брендинг</span>
+  <h1>Слово «куб» —<br><em>как куб.</em></h1>
+  <p class="lead">26 концептов: от строгой классики до странного и невероятного. Скажите номер — и я доведу выбранный вариант до готового логотипа и внедрю на сайт.</p>
+  <div class="legend">
+    <span><b>01–05</b>классика</span>
+    <span><b>06–10</b>современное</span>
+    <span><b>11–14</b>игривое</span>
+    <span><b>15–17</b>кринж</span>
+    <span><b>18–21</b>странное</span>
+    <span><b>22–26</b>невероятное</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="grid">
+
+    <!-- 01 -->
+    <article class="card">
+      <div class="card-top"><span class="num">01</span><span class="tag">классика</span></div>
+      <div class="stage soft">
+        <div class="wm wm--lg">
+          <span>FORMA</span>
+          <span class="cube-word">
+            <svg class="iso" viewBox="0 0 100 100" aria-hidden="true">
+              <polygon class="t" points="50,4 96,30 50,56 4,30"/>
+              <polygon class="l" points="4,30 50,56 50,96 4,70"/>
+              <polygon class="r" points="96,30 50,56 50,96 96,70"/>
+            </svg>
+            <b>KUB</b>
+          </span>
+        </div>
+      </div>
+      <h3>Изометрический куб</h3>
+      <p>Спокойная классика: «KUB» становится объёмным кубом, который замыкает слово.</p>
+    </article>
+
+    <!-- 02 -->
+    <article class="card">
+      <div class="card-top"><span class="num">02</span><span class="tag">классика</span></div>
+      <div class="stage soft">
+        <div class="wm wm--lg">FORMAKUB <span class="mini-cube"></span></div>
+      </div>
+      <h3>Куб вместо точки</h3>
+      <p>Минимальное вмешательство: фирменная точка превращается в маленький куб.</p>
+    </article>
+
+    <!-- 03 -->
+    <article class="card">
+      <div class="card-top"><span class="num">03</span><span class="tag">классика</span></div>
+      <div class="stage soft">
+        <div class="wm wm--lg" style="align-items:flex-end">
+          <span>FORMAK</span>
+          <span class="u-cube">
+            <svg class="iso" viewBox="0 0 100 100" aria-hidden="true">
+              <polygon class="t" points="50,4 96,30 50,56 4,30"/>
+              <polygon class="l" points="4,30 50,56 50,96 4,70"/>
+              <polygon class="r" points="96,30 50,56 50,96 96,70"/>
+            </svg>
+          </span>
+          <span>B</span>
+        </div>
+      </div>
+      <h3>U = куб</h3>
+      <p>Буква «U» заменяется кубом: FORMAK + куб + B. Читается как слово, видится как знак.</p>
+    </article>
+
+    <!-- 04 -->
+    <article class="card">
+      <div class="card-top"><span class="num">04</span><span class="tag">классика</span></div>
+      <div class="stage">
+        <div class="mono-wrap">
+          <div class="monogram"><span class="mf">F</span><span class="mc"></span></div>
+          <div class="mono-caption">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Штамп-монограмма</h3>
+      <p>Строгий знак для документов, клейма на мебели и визиток: F в рамке и куб-печать.</p>
+    </article>
+
+    <!-- 05 -->
+    <article class="card">
+      <div class="card-top"><span class="num">05</span><span class="tag">классика</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1rem">
+          <div class="cabinet">
+            <span></span><span></span><span></span>
+            <span></span><span class="on"></span><span></span>
+            <span></span><span></span><span></span>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Модульный куб</h3>
+      <p>Куб собран из мебельных модулей. Одна ячейка — фирменная медь, как акцент.</p>
+    </article>
+
+    <!-- 06 -->
+    <article class="card">
+      <div class="card-top"><span class="num">06</span><span class="tag">современное</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="scene">
+            <div class="cube">
+              <div class="face f-front"></div><div class="face f-back"></div>
+              <div class="face f-right"></div><div class="face f-left"></div>
+              <div class="face f-top"></div><div class="face f-bottom"></div>
+            </div>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Вращающийся куб</h3>
+      <p>Живой знак для сайта и соцсетей: куб медленно вращается, подпись остаётся статичной.</p>
+    </article>
+
+    <!-- 07 -->
+    <article class="card">
+      <div class="card-top"><span class="num">07</span><span class="tag">современное</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="scene">
+            <div class="cube cube--wire">
+              <div class="face f-front"></div><div class="face f-back"></div>
+              <div class="face f-right"></div><div class="face f-left"></div>
+              <div class="face f-top"></div><div class="face f-bottom"></div>
+            </div>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Wireframe-куб</h3>
+      <p>Каркас без заливки — язык чертежа и 2D-схем, из которых начинается проект.</p>
+    </article>
+
+    <!-- 08 -->
+    <article class="card">
+      <div class="card-top"><span class="num">08</span><span class="tag">современное</span></div>
+      <div class="stage dark">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="scene">
+            <div class="cube cube--glass">
+              <div class="face f-front"></div><div class="face f-back"></div>
+              <div class="face f-right"></div><div class="face f-left"></div>
+              <div class="face f-top"></div><div class="face f-bottom"></div>
+            </div>
+          </div>
+          <div class="wm wm--light">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Стеклянный куб</h3>
+      <p>Премиальная подача: прозрачные грани, блики и тёмный фон. Для презентаций и упаковки.</p>
+    </article>
+
+    <!-- 09 -->
+    <article class="card">
+      <div class="card-top"><span class="num">09</span><span class="tag">современное</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.1rem">
+          <div class="shelf"><span></span><span></span><span></span></div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб-стеллаж</h3>
+      <p>Куб как полки: знак буквально говорит, чем занимается компания.</p>
+    </article>
+
+    <!-- 10 -->
+    <article class="card">
+      <div class="card-top"><span class="num">10</span><span class="tag">современное</span></div>
+      <div class="stage">
+        <div class="stack">
+          <span class="s1">FORMA</span>
+          <span class="s2">
+            <span class="s-cube">
+              <svg class="iso" viewBox="0 0 100 100" aria-hidden="true">
+                <polygon class="t" points="50,4 96,30 50,56 4,30"/>
+                <polygon class="l" points="4,30 50,56 50,96 4,70"/>
+                <polygon class="r" points="96,30 50,56 50,96 96,70"/>
+              </svg>
+            </span>
+            KUB
+          </span>
+          <span class="s3">мебель по размерам</span>
+        </div>
+      </div>
+      <h3>Стековая композиция</h3>
+      <p>Вертикальный замок: «FORMA» сверху, куб-акцент, «KUB» снизу. Хорошо для узких мест.</p>
+    </article>
+
+    <!-- 11 -->
+    <article class="card">
+      <div class="card-top"><span class="num">11</span><span class="tag">игривое</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="toy toy--smile">
+            <span class="eye l"></span><span class="eye r"></span><span class="mouth"></span>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб-смайлик</h3>
+      <p>Дружелюбный знак для соцсетей и детской мебели. Мягкий, но не инфантильный.</p>
+    </article>
+
+    <!-- 12 -->
+    <article class="card">
+      <div class="card-top"><span class="num">12</span><span class="tag">игривое</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="toy toy--dice">
+            <div class="dice-grid">
+              <i style="grid-area:1/1"></i><i style="grid-area:1/3"></i>
+              <i style="grid-area:2/2"></i>
+              <i style="grid-area:3/1"></i><i style="grid-area:3/3"></i>
+            </div>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб-кость</h3>
+      <p>Игра в размеры: сколько выпало — столько модулей. Игриво, но с намёком на конфигуратор.</p>
+    </article>
+
+    <!-- 13 -->
+    <article class="card">
+      <div class="card-top"><span class="num">13</span><span class="tag">игривое</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="toy toy--voxel"></div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Воксельный куб</h3>
+      <p>Пиксельный блок в духе Minecraft. Для молодой аудитории и digital-кампаний.</p>
+    </article>
+
+    <!-- 14 -->
+    <article class="card">
+      <div class="card-top"><span class="num">14</span><span class="tag">игривое</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="toy toy--googly">
+            <span class="g-eye l"><i></i></span><span class="g-eye r"><i></i></span>
+            <span class="blush l"></span><span class="blush r"></span>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб с глазами</h3>
+      <p>Куб, который «смотрит» за курсором. Максимум обаяния для лендинга и стикеров.</p>
+    </article>
+
+    <!-- 15 -->
+    <article class="card">
+      <div class="card-top"><span class="num">15</span><span class="tag">кринж</span></div>
+      <div class="stage soft">
+        <div style="display:grid;place-items:center;gap:1rem">
+          <div class="emoji">🧊</div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб-эмодзи</h3>
+      <p>Ледяной кубик вместо логотипа. Быстро, дёшево и очень по-своему честно.</p>
+    </article>
+
+    <!-- 16 -->
+    <article class="card">
+      <div class="card-top"><span class="num">16</span><span class="tag">кринж</span></div>
+      <div class="stage">
+        <div class="character">
+          <span class="arm l"></span><span class="arm r"></span>
+          <div class="toy toy--smile">
+            <span class="eye l"></span><span class="eye r"></span><span class="mouth"></span>
+          </div>
+          <span class="leg l"></span><span class="leg r"></span>
+        </div>
+      </div>
+      <h3>Куб-персонаж</h3>
+      <p>У куба есть руки и ноги — он может «собрать» мебель. Маскот для рекламы.</p>
+    </article>
+
+    <!-- 17 -->
+    <article class="card">
+      <div class="card-top"><span class="num">17</span><span class="tag">кринж</span></div>
+      <div class="stage">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="toy toy--smile" style="--c:var(--copper-2)">
+            <span class="shades"></span><span class="smirk"></span>
+          </div>
+          <div class="wm">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Куб в очках</h3>
+      <p>«Мы знаем, что делаем»: куб в тёмных очках. Кринж-уровень: уверенный средний.</p>
+    </article>
+
+    <!-- 18 -->
+    <article class="card">
+      <div class="card-top"><span class="num">18</span><span class="tag">странное</span></div>
+      <div class="stage">
+        <div class="net">
+          <span class="n1">F</span>
+          <span class="n2">O</span>
+          <span class="n3">R</span>
+          <span class="n4">M</span>
+          <span class="n5">A</span>
+          <span class="n6 kub">KUB</span>
+        </div>
+      </div>
+      <h3>Развёртка куба</h3>
+      <p>Куб разложен в плоскую сетку, а грани стали буквами. Странно, но объяснимо.</p>
+    </article>
+
+    <!-- 19 -->
+    <article class="card">
+      <div class="card-top"><span class="num">19</span><span class="tag">странное</span></div>
+      <div class="stage soft">
+        <div class="glitch">FORMAKUB<span class="gc" aria-hidden="true">FORMAKUB</span><span class="gm" aria-hidden="true">FORMAKUB</span></div>
+      </div>
+      <h3>Глитч-куб</h3>
+      <p>Цифровой сбой: знак рассыпается на каналы. Для digital-направления и экспериментов.</p>
+    </article>
+
+    <!-- 20 -->
+    <article class="card">
+      <div class="card-top"><span class="num">20</span><span class="tag">странное</span></div>
+      <div class="stage">
+        <div class="liquid"></div>
+      </div>
+      <h3>Жидкий куб</h3>
+      <p>Куб, который не хочет быть кубом: форма «плывёт». Пластика, эпоксидка, литьё.</p>
+    </article>
+
+    <!-- 21 -->
+    <article class="card">
+      <div class="card-top"><span class="num">21</span><span class="tag">странное</span></div>
+      <div class="stage">
+        <div class="nest"><span></span><span></span><span></span></div>
+      </div>
+      <h3>Куб-матрёшка</h3>
+      <p>Куб внутри куба внутри куба — бесконечное пространство хранения.</p>
+    </article>
+
+    <!-- 22 -->
+    <article class="card">
+      <div class="card-top"><span class="num">22</span><span class="tag">невероятное</span></div>
+      <div class="stage">
+        <div class="scene">
+          <div class="cube cube--letters">
+            <div class="face f-front">K</div><div class="face f-back">U</div>
+            <div class="face f-right">B</div><div class="face f-left">F</div>
+            <div class="face f-top">●</div><div class="face f-bottom">✦</div>
+          </div>
+        </div>
+      </div>
+      <h3>Буквы на гранях</h3>
+      <p>K, U, B живут на гранях куба. Вращается — складывается слово.</p>
+    </article>
+
+    <!-- 23 -->
+    <article class="card">
+      <div class="card-top"><span class="num">23</span><span class="tag">невероятное</span></div>
+      <div class="stage">
+        <div class="scene">
+          <div class="cube cube--explode">
+            <div class="face f-front"></div><div class="face f-back"></div>
+            <div class="face f-right"></div><div class="face f-left"></div>
+            <div class="face f-top"></div><div class="face f-bottom"></div>
+          </div>
+        </div>
+        <span class="hint">наведите</span>
+      </div>
+      <h3>Куб-трансформер</h3>
+      <p>При наведении грани разлетаются, как мебель на сборке. Интерактивный знак.</p>
+    </article>
+
+    <!-- 24 -->
+    <article class="card">
+      <div class="card-top"><span class="num">24</span><span class="tag">невероятное</span></div>
+      <div class="stage">
+        <div class="cube cube--rubik" style="--s:104px">
+          <div class="face f-front"></div><div class="face f-back"></div>
+          <div class="face f-right"></div><div class="face f-left"></div>
+          <div class="face f-top"></div><div class="face f-bottom"></div>
+        </div>
+      </div>
+      <h3>Куб-рубик</h3>
+      <p>Многоцветная головоломка в фирменной палитре. Сложно, азартно, запоминается.</p>
+    </article>
+
+    <!-- 25 -->
+    <article class="card">
+      <div class="card-top"><span class="num">25</span><span class="tag">невероятное</span></div>
+      <div class="stage dark">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="scene">
+            <div class="cube cube--holo">
+              <div class="face f-front"></div><div class="face f-back"></div>
+              <div class="face f-right"></div><div class="face f-left"></div>
+              <div class="face f-top"></div><div class="face f-bottom"></div>
+            </div>
+          </div>
+          <div class="wm wm--light">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Голографический куб</h3>
+      <p>Иридесцентные грани переливаются. Премиум-технологии, свет, упаковка.</p>
+    </article>
+
+    <!-- 26 -->
+    <article class="card">
+      <div class="card-top"><span class="num">26</span><span class="tag">невероятное</span></div>
+      <div class="stage dark">
+        <div style="display:grid;place-items:center;gap:1.4rem">
+          <div class="scene scene--neon">
+            <div class="cube cube--neon">
+              <div class="face f-front"></div><div class="face f-back"></div>
+              <div class="face f-right"></div><div class="face f-left"></div>
+              <div class="face f-top"></div><div class="face f-bottom"></div>
+            </div>
+          </div>
+          <div class="wm wm--light">FORMAKUB</div>
+        </div>
+      </div>
+      <h3>Неоновый куб</h3>
+      <p>Светящийся каркас в темноте: вывеска, витрина, ночной город.</p>
+    </article>
+
+  </section>
+</main>
+
+<footer class="foot wrap">
+  <p>Напишите номер выбранного варианта — например <b>«беру 08»</b> — и я доработаю его: пропорции, цвета, версии для шапки, фавикона и печати.</p>
+</footer>
+
+<script>
+  (function () {
+    var palette = ['#b87849', '#e1a570', '#161310', '#d6c6b1', '#6f755f', '#f3eee5'];
+    document.querySelectorAll('.cube--rubik .face').forEach(function (face, fi) {
+      var base = palette[fi % palette.length];
+      for (var i = 0; i < 9; i++) {
+        var cell = document.createElement('span');
+        var mixed = (i * 13 + fi * 7) % 17 === 0;
+        cell.style.background = mixed ? palette[(fi + 2) % palette.length] : base;
+        face.appendChild(cell);
+      }
+    });
+  })();
+</script>
+</body>
+</html>

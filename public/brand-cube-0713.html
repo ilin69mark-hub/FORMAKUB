@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>07.13 — латунь · чёрный · 23 вариации</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Prata&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500;1,600&family=Playfair+Display:ital,wght@1,400;1,600&family=Unbounded:wght@400;600&family=Oswald:wght@300;500&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#161310; --cream:#f3eee5; --cream-2:#e8dfd2; --sand:#d6c6b1;
+    --copper:#b87849; --copper-2:#e1a570; --copper-3:#8f5a34; --olive:#6f755f;
+    --serif:"Prata",Georgia,"Times New Roman",serif;
+    --sans:"Manrope",system-ui,-apple-system,sans-serif;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--cream);scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--ink);line-height:1.55;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 700px at 88% -8%, rgba(225,165,112,.20), transparent 58%),
+      radial-gradient(900px 600px at -8% 18%, rgba(214,198,177,.42), transparent 62%),
+      var(--cream);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .wrap{width:min(100% - clamp(1.5rem,5vw,6rem), 96rem);margin-inline:auto;position:relative;z-index:1}
+
+  .top{padding:clamp(3rem,7vw,5.5rem) 0 clamp(1.5rem,3vw,2.2rem)}
+  .back{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:rgba(22,19,16,.55);text-decoration:none;
+    transition:color .3s var(--ease)}
+  .back:hover{color:var(--copper)}
+  .eyebrow{display:inline-flex;align-items:center;gap:.6rem;margin-top:1.4rem;
+    font-size:.68rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(22,19,16,.6)}
+  .eyebrow::before{content:"";width:2rem;height:1px;background:var(--copper)}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.4rem,6vw,4.8rem);
+    line-height:.98;letter-spacing:-.035em;margin:1.1rem 0 0}
+  h1 em{font-style:italic;color:var(--copper)}
+  .lead{max-width:48rem;margin:1.2rem 0 0;font-size:1rem;color:rgba(22,19,16,.65)}
+  .lead b{color:var(--ink);font-weight:700}
+  .note{display:inline-flex;align-items:center;gap:.55rem;margin-top:1.2rem;padding:.45rem .8rem;
+    border:1px solid rgba(184,120,73,.35);border-radius:999px;background:rgba(184,120,73,.08);
+    font-size:.68rem;font-weight:700;letter-spacing:.08em;color:var(--copper-3)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr));
+    gap:1.1rem;padding:clamp(1.4rem,3vw,2.4rem) 0 4rem}
+
+  .card{display:flex;flex-direction:column;gap:.85rem;padding:1rem;border-radius:1.4rem;
+    background:rgba(255,255,255,.52);border:1px solid rgba(22,19,16,.1);
+    box-shadow:0 24px 60px -48px rgba(22,19,16,.55);
+    transition:transform .5s var(--ease), border-color .5s var(--ease), box-shadow .5s var(--ease)}
+  .card:hover{transform:translateY(-4px);border-color:rgba(184,120,73,.42);
+    box-shadow:0 34px 70px -46px rgba(22,19,16,.5)}
+
+  .meta{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:0 .2rem}
+  .id{display:flex;align-items:baseline;gap:.55rem;min-width:0}
+  .num{font-family:var(--serif);font-size:1.12rem;line-height:1;color:var(--copper);flex:none}
+  .name{font-size:.64rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+    color:rgba(22,19,16,.46);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{flex:none;font-size:.52rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--cream);background:var(--copper-3);padding:.3rem .55rem;border-radius:999px}
+  .chips{display:flex;gap:.28rem;flex:none}
+  .chips i{width:.6rem;height:.6rem;border-radius:50%;box-shadow:0 0 0 1px rgba(22,19,16,.12)}
+
+  .stage{position:relative;height:15.5rem;border-radius:1rem;overflow:hidden;
+    background:var(--stage);display:grid;place-items:center;
+    box-shadow:inset 0 0 0 1px rgba(22,19,16,.05)}
+  .stage::before{content:"";position:absolute;inset:-30%;z-index:0;
+    background:
+      radial-gradient(closest-side circle at 28% 32%, var(--blob1), transparent 72%),
+      radial-gradient(closest-side circle at 74% 68%, var(--blob2), transparent 72%);
+    filter:blur(22px);opacity:.95}
+
+  .scene{position:relative;z-index:1;width:100%;height:100%;display:grid;place-items:center;
+    perspective:950px}
+  .cube{--s:118px;--speed:19s;--tilt:-24deg;position:relative;width:var(--s);height:var(--s);
+    transform-style:preserve-3d;animation:spin var(--speed) linear infinite}
+  @keyframes spin{
+    from{transform:rotateX(var(--tilt)) rotateY(0deg)}
+    to{transform:rotateX(var(--tilt)) rotateY(360deg)}
+  }
+  .stage:hover .cube{animation-play-state:paused}
+
+  .f{position:absolute;inset:0;display:grid;place-items:center;
+    background:var(--face);background-size:var(--bgsize,auto);
+    border:var(--bw,1px) solid var(--edge);
+    box-shadow:inset 0 0 26px var(--glow), inset 0 1px 0 rgba(255,255,255,.4);
+    backdrop-filter:blur(10px) saturate(1.2);
+    -webkit-backdrop-filter:blur(10px) saturate(1.2);
+    color:var(--text);font-family:var(--ff,var(--sans));font-weight:800;
+    font-size:var(--fs,.78rem);letter-spacing:var(--ls,.24em);text-indent:var(--ls,.24em);
+    white-space:nowrap;user-select:none}
+  .f::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background:var(--sheen,linear-gradient(140deg, rgba(255,255,255,.30), rgba(255,255,255,.08) 58%, rgba(255,255,255,.18)))}
+  .f .t{position:relative;z-index:1}
+  .f-front{transform:translateZ(calc(var(--s)/2))}
+  .f-back{transform:rotateY(180deg) translateZ(calc(var(--s)/2))}
+  .f-right{transform:rotateY(90deg) translateZ(calc(var(--s)/2))}
+  .f-left{transform:rotateY(-90deg) translateZ(calc(var(--s)/2))}
+  .f-top{transform:rotateX(90deg) translateZ(calc(var(--s)/2))}
+  .f-bottom{transform:rotateX(-90deg) translateZ(calc(var(--s)/2))}
+
+  /* ---------- effects ---------- */
+  .neon .f{box-shadow:inset 0 0 30px var(--glow), 0 0 18px var(--glow),
+    inset 0 1px 0 rgba(255,255,255,.3);border-width:2px}
+  .scan .stage::after{content:"";position:absolute;left:0;right:0;top:0;height:38%;z-index:3;
+    pointer-events:none;opacity:.75;
+    background:linear-gradient(180deg,transparent 0%,rgba(225,165,112,.25) 45%,
+      rgba(225,165,112,.9) 50%,rgba(225,165,112,.25) 55%,transparent 100%);
+    animation:scan 3.6s linear infinite}
+  @keyframes scan{0%{transform:translateY(-130%)}100%{transform:translateY(330%)}}
+
+  .orbit .scene::before,.orbit .scene::after{content:"";position:absolute;left:50%;top:50%;
+    width:6px;height:6px;border-radius:50%;background:var(--copper-2);
+    box-shadow:0 0 12px var(--copper-2);z-index:2;pointer-events:none;
+    animation:orbit 5.5s linear infinite}
+  .orbit .scene::after{width:4px;height:4px;background:#fff;box-shadow:0 0 10px #fff;
+    animation-duration:7.5s;animation-direction:reverse}
+  @keyframes orbit{from{transform:translate(-50%,-50%) rotate(0deg) translateX(92px)}
+    to{transform:translate(-50%,-50%) rotate(360deg) translateX(92px)}}
+
+  .breathe .f{animation:breathe 4.6s ease-in-out infinite}
+  @keyframes breathe{
+    0%,100%{box-shadow:inset 0 0 22px var(--glow), inset 0 1px 0 rgba(255,255,255,.4)}
+    50%{box-shadow:inset 0 0 40px var(--glow), 0 0 24px var(--glow),
+      inset 0 1px 0 rgba(255,255,255,.4)}}
+
+  .flicker .t{animation:flick 4.2s steps(1,end) infinite}
+  @keyframes flick{0%,100%{opacity:1}42%{opacity:1}44%{opacity:.35}46%{opacity:1}
+    58%{opacity:.5}59%{opacity:1}61%{opacity:.25}63%{opacity:1}}
+
+  .shimmer .t{background:linear-gradient(100deg,#8f5a34 0%,#f0cfa8 28%,#ffffff 44%,
+      #e1a570 60%,#8f5a34 100%);background-size:250% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    -webkit-text-fill-color:transparent;animation:sheen 5.5s linear infinite}
+  @keyframes sheen{0%{background-position:0% 50%}100%{background-position:250% 50%}}
+
+  /* ---------- 07.13 base ---------- */
+  .v0{--stage:#0e0c0a;--blob1:#8f5a34;--blob2:#b87849;
+    --face:rgba(184,120,73,.16);--edge:rgba(225,165,112,.78);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.4);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:114px;--speed:20s;--tilt:-21deg}
+
+  /* 1 неоновая латунь */
+  .v1{--stage:#0b0a08;--blob1:#b87849;--blob2:#e1a570;
+    --face:rgba(225,165,112,.10);--edge:#ffbe73;--text:#ffd9a8;
+    --glow:rgba(255,170,80,.75);--ff:var(--sans);--ls:.28em;--fs:.72rem;
+    --s:118px;--speed:16s;--tilt:-20deg}
+
+  /* 2 кибер-цех */
+  .v2{--stage:#080b10;--blob1:#18d0d0;--blob2:#d02a9c;
+    --face:repeating-linear-gradient(0deg, rgba(120,220,255,.10) 0 1px, transparent 1px 5px),
+      rgba(30,60,80,.35);
+    --edge:rgba(120,230,255,.8);--text:#d8fbff;--glow:rgba(24,200,220,.5);
+    --ff:"JetBrains Mono",monospace;--ls:.14em;--fs:.66rem;--bgsize:auto;
+    --s:116px;--speed:12s;--tilt:-19deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+
+  /* 3 ар-деко */
+  .v3{--stage:#100d09;--blob1:#8f5a34;--blob2:#d6c6b1;
+    --face:repeating-linear-gradient(135deg, rgba(225,165,112,.20) 0 1px, transparent 1px 11px),
+      repeating-linear-gradient(45deg, rgba(225,165,112,.12) 0 1px, transparent 1px 16px),
+      linear-gradient(160deg, rgba(60,42,24,.55), rgba(12,10,8,.75));
+    --edge:rgba(225,165,112,.85);--text:#f0cfa8;--glow:rgba(225,165,112,.3);
+    --ff:var(--serif);--ls:.18em;--fs:.8rem;--s:120px;--speed:24s;--tilt:-25deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.12),transparent 65%)}
+
+  /* 4 гравировка */
+  .v4{--stage:#0d0b08;--blob1:#6f5535;--blob2:#b87849;
+    --face:repeating-radial-gradient(circle at 50% 50%, rgba(225,165,112,.16) 0 1px, transparent 1px 7px),
+      rgba(20,15,10,.55);
+    --edge:rgba(225,165,112,.55);--text:#e8c79a;--glow:rgba(225,165,112,.25);
+    --ff:"Cormorant Garamond",serif;--ls:.16em;--fs:1rem;--s:118px;--speed:26s;--tilt:-23deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+
+  /* 5 чертёж */
+  .v5{--stage:#08111c;--blob1:#1d3f66;--blob2:#3f7eb0;
+    --face:linear-gradient(rgba(130,190,240,.18) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(130,190,240,.18) 1px, transparent 1px),
+      rgba(12,32,54,.55);
+    --edge:rgba(150,205,255,.75);--text:#d6ecff;--glow:rgba(90,170,230,.35);
+    --ff:"JetBrains Mono",monospace;--ls:.18em;--fs:.64rem;--bgsize:16px 16px;
+    --s:120px;--speed:22s;--tilt:-26deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+
+  /* 6 дерево */
+  .v6{--stage:#140e09;--blob1:#5a3a22;--blob2:#b87849;
+    --face:repeating-linear-gradient(92deg, rgba(120,80,45,.55) 0 5px, rgba(70,44,24,.65) 5px 8px,
+      rgba(40,25,14,.6) 8px 12px);
+    --edge:rgba(225,165,112,.7);--text:#f0cfa8;--glow:rgba(160,100,55,.3);
+    --ff:var(--serif);--ls:.2em;--fs:.78rem;--s:116px;--speed:20s;--tilt:-22deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.14),transparent 62%)}
+
+  /* 7 мрамор · лайм */
+  .v7{--stage:#0f120c;--blob1:#a8c46a;--blob2:#3a3d34;
+    --face:repeating-linear-gradient(115deg, transparent 0 16px, rgba(255,255,255,.12) 16px 17px,
+        transparent 17px 44px),
+      linear-gradient(140deg, rgba(230,235,220,.16), rgba(40,45,35,.5) 70%);
+    --edge:#a8c46a;--text:#d6f07a;--glow:rgba(168,196,106,.45);
+    --ff:var(--sans);--ls:.26em;--fs:.72rem;--s:118px;--speed:18s;--tilt:-27deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.18),transparent 60%)}
+
+  /* 8 кожа · магента */
+  .v8{--stage:#160a12;--blob1:#7a2f52;--blob2:#ff3d9a;
+    --face:radial-gradient(circle at 30% 30%, rgba(255,255,255,.07) 0 1px, transparent 1px),
+      radial-gradient(circle at 70% 65%, rgba(0,0,0,.35) 0 1px, transparent 1px),
+      rgba(60,35,40,.6);
+    --edge:#ff3d9a;--text:#ffd0e6;--glow:rgba(255,61,154,.4);
+    --ff:var(--sans);--ls:.28em;--fs:.7rem;--bgsize:6px 6px;
+    --s:116px;--speed:17s;--tilt:-20deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+
+  /* 9 терраццо */
+  .v9{--stage:#14110d;--blob1:#d6c6b1;--blob2:#b87849;
+    --face:radial-gradient(circle at 22% 28%, #e8dfd2 0 3px, transparent 4px),
+      radial-gradient(circle at 72% 62%, #b87849 0 2px, transparent 3px),
+      radial-gradient(circle at 40% 78%, #6f755f 0 2px, transparent 3px),
+      radial-gradient(circle at 86% 20%, #d6c6b1 0 2px, transparent 3px),
+      rgba(255,255,255,.06);
+    --edge:rgba(214,198,177,.85);--text:#f3eee5;--glow:rgba(214,198,177,.3);
+    --ff:var(--sans);--ls:.26em;--fs:.72rem;--bgsize:38px 38px;
+    --s:120px;--speed:21s;--tilt:-24deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.14),transparent 60%)}
+
+  /* 10 карбон */
+  .v10{--stage:#0a0a0a;--blob1:#3a3a3a;--blob2:#8f5a34;
+    --face:repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 2px, transparent 2px 4px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,.5) 0 2px, transparent 2px 4px),
+      rgba(25,25,25,.75);
+    --edge:rgba(225,165,112,.6);--text:#e1a570;--glow:rgba(225,165,112,.22);
+    --ff:var(--sans);--ls:.3em;--fs:.68rem;--bgsize:auto;
+    --s:114px;--speed:23s;--tilt:-22deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 55%)}
+
+  /* 11 шахматы */
+  .v11{--stage:#0b0a09;--blob1:#8f5a34;--blob2:#d6c6b1;
+    --face:conic-gradient(from 90deg, rgba(225,165,112,.30) 0 25%, rgba(0,0,0,0) 0 50%,
+      rgba(225,165,112,.30) 0 75%, rgba(0,0,0,0) 0), rgba(20,16,12,.6);
+    --edge:rgba(225,165,112,.9);--text:#f7e6cf;--glow:rgba(225,165,112,.3);
+    --ff:var(--sans);--ls:.24em;--fs:.74rem;--bgsize:28px 28px;
+    --s:118px;--speed:25s;--tilt:-25deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.12),transparent 60%)}
+
+  /* 12 опасная зона */
+  .v12{--stage:#0c0b09;--blob1:#c9a227;--blob2:#5a4a10;
+    --face:repeating-linear-gradient(45deg, rgba(201,162,39,.5) 0 9px, rgba(12,10,8,.75) 9px 18px);
+    --edge:#e0b93a;--text:#f2d76b;--glow:rgba(201,162,39,.35);
+    --ff:"Oswald",sans-serif;--ls:.26em;--fs:.86rem;--s:116px;--speed:19s;--tilt:-23deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.16),transparent 55%)}
+
+  /* 13 8-бит */
+  .v13{--stage:#070707;--blob1:#4a3a2a;--blob2:#8f5a34;
+    --face:linear-gradient(rgba(225,165,112,.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(225,165,112,.12) 1px, transparent 1px),
+      rgba(18,15,12,.85);
+    --edge:rgba(225,165,112,.7);--text:#f0cfa8;--glow:rgba(225,165,112,.2);
+    --ff:"JetBrains Mono",monospace;--ls:.08em;--fs:.66rem;--bgsize:9px 9px;
+    --s:112px;--speed:15s;--tilt:-18deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.08),transparent 55%)}
+  .v13 .t{text-shadow:2px 2px 0 #8f5a34, -2px -2px 0 rgba(208,42,156,.35)}
+
+  /* 14 барочный неон */
+  .v14{--stage:#120810;--blob1:#5a2a4a;--blob2:#ff3d9a;
+    --face:repeating-radial-gradient(circle at 50% 50%, rgba(225,165,112,.14) 0 1px, transparent 1px 8px),
+      rgba(30,12,24,.6);
+    --edge:#ff5aa8;--text:#f0cfa8;--glow:rgba(255,61,154,.45);
+    --ff:"Playfair Display",serif;--ls:.14em;--fs:.94rem;--s:120px;--speed:27s;--tilt:-26deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 55%)}
+  .v14 .t{font-style:italic;font-weight:600}
+
+  /* 15 дыхание */
+  .v15{--stage:#0e0c0a;--blob1:#b87849;--blob2:#e1a570;
+    --face:rgba(184,120,73,.16);--edge:rgba(225,165,112,.8);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.5);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:118px;--speed:20s;--tilt:-22deg}
+
+  /* 16 мерцание */
+  .v16{--stage:#0a0908;--blob1:#8f5a34;--blob2:#e1a570;
+    --face:rgba(225,165,112,.10);--edge:#ffbe73;--text:#ffd9a8;
+    --glow:rgba(255,170,80,.7);--ff:"JetBrains Mono",monospace;--ls:.24em;--fs:.66rem;
+    --s:116px;--speed:18s;--tilt:-21deg}
+
+  /* 17 сканер */
+  .v17{--stage:#08111c;--blob1:#1d3f66;--blob2:#3f7eb0;
+    --face:linear-gradient(rgba(130,190,240,.16) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(130,190,240,.16) 1px, transparent 1px),
+      rgba(12,32,54,.6);
+    --edge:rgba(150,205,255,.8);--text:#d6ecff;--glow:rgba(90,170,230,.35);
+    --ff:"JetBrains Mono",monospace;--ls:.18em;--fs:.64rem;--bgsize:16px 16px;
+    --s:120px;--speed:24s;--tilt:-26deg;--sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+
+  /* 18 орбита */
+  .v18{--stage:#0d0b08;--blob1:#8f5a34;--blob2:#b87849;
+    --face:rgba(184,120,73,.14);--edge:rgba(225,165,112,.8);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.4);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:112px;--speed:22s;--tilt:-23deg}
+
+  /* 19 шиммер */
+  .v19{--stage:#0b0907;--blob1:#8f5a34;--blob2:#d6c6b1;
+    --face:rgba(184,120,73,.12);--edge:rgba(225,165,112,.7);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.28);--ff:"Unbounded",sans-serif;--ls:.14em;--fs:.6rem;
+    --s:120px;--speed:19s;--tilt:-22deg}
+
+  /* 20 нижний регистр */
+  .v20{--stage:#0c0b09;--blob1:#3a322a;--blob2:#8f5a34;
+    --face:rgba(225,165,112,.06);--edge:rgba(225,165,112,.4);--text:#e8c79a;
+    --glow:rgba(225,165,112,.14);--ff:"Cormorant Garamond",serif;--ls:.14em;--fs:1.05rem;
+    --s:122px;--speed:28s;--tilt:-24deg;
+    --sheen:linear-gradient(140deg,rgba(255,255,255,.10),transparent 60%)}
+  .v20 .t{text-transform:lowercase;font-style:italic;font-weight:500}
+
+  /* 21 инверсия */
+  .v21{--stage:#e8dfd2;--blob1:#d6c6b1;--blob2:#b87849;
+    --face:rgba(22,19,16,.34);--edge:rgba(22,19,16,.85);--text:#f3eee5;
+    --glow:rgba(22,19,16,.25);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:118px;--speed:21s;--tilt:-23deg}
+
+  /* 22 гравитация */
+  .v22{--stage:#0d0b09;--blob1:#8f5a34;--blob2:#6f5535;
+    --face:rgba(184,120,73,.14);--edge:rgba(225,165,112,.8);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.35);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:108px;--speed:30s;--tilt:-52deg}
+
+  footer.foot{padding:0 0 4rem;color:rgba(22,19,16,.5);font-size:.78rem}
+  footer.foot b{color:var(--copper)}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <a class="back" href="/brand-cube-07.html">&larr; вариации 07</a>
+  <br>
+  <span class="eyebrow">07.13 · углублённая работа</span>
+  <h1>Латунь<br><em>и всё остальное.</em></h1>
+  <p class="lead">Развиваем именно <b>07.13</b>: неон, узоры, темы, анимация, шрифты — и намеренно несочетаемые сочетания. Первый куб — <b>ровно тот, что вы выбрали</b>, дальше 22 эксперимента. Скажите номер, например <b>«07.13.14»</b>.</p>
+  <span class="note">07.13 — базовый · без изменений</span>
+</header>
+
+<main class="wrap">
+  <section class="grid">
+
+    <article class="card v0">
+      <div class="meta">
+        <div class="id"><span class="num">07.13</span><span class="name">латунь · чёрный</span></div>
+        <span class="badge">как выбрали</span>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v1 neon">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.1</span><span class="name">неоновая латунь</span></div>
+        <div class="chips"><i style="background:#ffbe73"></i><i style="background:#ffaa50"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v2">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.2</span><span class="name">кибер-цех</span></div>
+        <div class="chips"><i style="background:#18d0d0"></i><i style="background:#d02a9c"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v3">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.3</span><span class="name">ар-деко</span></div>
+        <div class="chips"><i style="background:#e1a570"></i><i style="background:#3c2a18"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v4">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.4</span><span class="name">гравировка</span></div>
+        <div class="chips"><i style="background:#e8c79a"></i><i style="background:#1a140e"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v5">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.5</span><span class="name">чертёж</span></div>
+        <div class="chips"><i style="background:#82bef0"></i><i style="background:#0c2036"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v6">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.6</span><span class="name">дерево · латунь</span></div>
+        <div class="chips"><i style="background:#5a3a22"></i><i style="background:#e1a570"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v7">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.7</span><span class="name">мрамор · лайм</span></div>
+        <div class="chips"><i style="background:#a8c46a"></i><i style="background:#e6ebdc"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v8">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.8</span><span class="name">кожа · магента</span></div>
+        <div class="chips"><i style="background:#ff3d9a"></i><i style="background:#3c2328"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v9">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.9</span><span class="name">терраццо</span></div>
+        <div class="chips"><i style="background:#d6c6b1"></i><i style="background:#6f755f"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v10">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.10</span><span class="name">карбон</span></div>
+        <div class="chips"><i style="background:#8f5a34"></i><i style="background:#191919"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v11">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.11</span><span class="name">шахматы</span></div>
+        <div class="chips"><i style="background:#e1a570"></i><i style="background:#0b0a09"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v12">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.12</span><span class="name">опасная зона</span></div>
+        <div class="chips"><i style="background:#e0b93a"></i><i style="background:#0c0b09"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v13">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.13</span><span class="name">8-бит</span></div>
+        <div class="chips"><i style="background:#f0cfa8"></i><i style="background:#d02a9c"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v14 neon">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.14</span><span class="name">барочный неон</span></div>
+        <div class="chips"><i style="background:#ff5aa8"></i><i style="background:#f0cfa8"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v15 breathe">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.15</span><span class="name">дыхание</span></div>
+        <div class="chips"><i style="background:#b87849"></i><i style="background:#f0cfa8"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v16 neon flicker">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.16</span><span class="name">мерцание</span></div>
+        <div class="chips"><i style="background:#ffbe73"></i><i style="background:#0a0908"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v17 scan">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.17</span><span class="name">сканер</span></div>
+        <div class="chips"><i style="background:#82bef0"></i><i style="background:#e1a570"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v18 orbit">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.18</span><span class="name">орбита</span></div>
+        <div class="chips"><i style="background:#e1a570"></i><i style="background:#ffffff"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v19 shimmer">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.19</span><span class="name">шиммер</span></div>
+        <div class="chips"><i style="background:#ffffff"></i><i style="background:#8f5a34"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v20">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.20</span><span class="name">нижний регистр</span></div>
+        <div class="chips"><i style="background:#e8c79a"></i><i style="background:#3a322a"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v21">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.21</span><span class="name">инверсия</span></div>
+        <div class="chips"><i style="background:#e8dfd2"></i><i style="background:#161310"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+    <article class="card v22">
+      <div class="meta">
+        <div class="id"><span class="num">07.13.22</span><span class="name">гравитация</span></div>
+        <div class="chips"><i style="background:#8f5a34"></i><i style="background:#6f5535"></i></div>
+      </div>
+      <div class="stage"><div class="scene" data-text="FORMA"></div></div>
+    </article>
+
+  </section>
+</main>
+
+<footer class="foot wrap">
+  <p>Наведите на куб — вращение остановится, анимации продолжатся. Скажите номер — и я соберу финальный знак: анимацию, носители, фавикон и версии для шапки.</p>
+</footer>
+
+<script>
+  (function () {
+    document.querySelectorAll('.scene').forEach(function (scene) {
+      var text = scene.getAttribute('data-text') || 'FORMA';
+      var cube = document.createElement('div');
+      cube.className = 'cube';
+      ['f-front', 'f-back', 'f-right', 'f-left', 'f-top', 'f-bottom'].forEach(function (cls, i) {
+        var face = document.createElement('div');
+        face.className = 'f ' + cls;
+        if (i < 4) {
+          var span = document.createElement('span');
+          span.className = 't';
+          span.textContent = text;
+          face.appendChild(span);
+        }
+        cube.appendChild(face);
+      });
+      scene.appendChild(cube);
+    });
+  })();
+</script>
+</body>
+</html>

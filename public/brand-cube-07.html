@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>07 · FORMA на гранях — 14 вариаций</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Prata&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#161310; --cream:#f3eee5; --cream-2:#e8dfd2; --sand:#d6c6b1;
+    --copper:#b87849; --copper-2:#e1a570; --copper-3:#8f5a34; --olive:#6f755f;
+    --serif:"Prata",Georgia,"Times New Roman",serif;
+    --sans:"Manrope",system-ui,-apple-system,sans-serif;
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--cream);scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--ink);line-height:1.55;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 700px at 88% -8%, rgba(225,165,112,.20), transparent 58%),
+      radial-gradient(900px 600px at -8% 18%, rgba(214,198,177,.42), transparent 62%),
+      var(--cream);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  .wrap{width:min(100% - clamp(1.5rem,5vw,6rem), 96rem);margin-inline:auto;position:relative;z-index:1}
+
+  .top{padding:clamp(3rem,7vw,5.5rem) 0 clamp(1.5rem,3vw,2.2rem)}
+  .back{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;color:rgba(22,19,16,.55);text-decoration:none;
+    transition:color .3s var(--ease)}
+  .back:hover{color:var(--copper)}
+  .eyebrow{display:inline-flex;align-items:center;gap:.6rem;margin-top:1.4rem;
+    font-size:.68rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(22,19,16,.6)}
+  .eyebrow::before{content:"";width:2rem;height:1px;background:var(--copper)}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.4rem,6vw,4.8rem);
+    line-height:.98;letter-spacing:-.035em;margin:1.1rem 0 0}
+  h1 em{font-style:italic;color:var(--copper)}
+  .lead{max-width:46rem;margin:1.2rem 0 0;font-size:1rem;color:rgba(22,19,16,.65)}
+  .lead b{color:var(--ink);font-weight:700}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr));
+    gap:1.1rem;padding:clamp(1.4rem,3vw,2.4rem) 0 4rem}
+
+  .card{display:flex;flex-direction:column;gap:.85rem;padding:1rem;border-radius:1.4rem;
+    background:rgba(255,255,255,.52);border:1px solid rgba(22,19,16,.1);
+    box-shadow:0 24px 60px -48px rgba(22,19,16,.55);
+    transition:transform .5s var(--ease), border-color .5s var(--ease), box-shadow .5s var(--ease)}
+  .card:hover{transform:translateY(-4px);border-color:rgba(184,120,73,.42);
+    box-shadow:0 34px 70px -46px rgba(22,19,16,.5)}
+
+  .meta{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0 .2rem}
+  .id{display:flex;align-items:baseline;gap:.6rem;min-width:0}
+  .num{font-family:var(--serif);font-size:1.18rem;line-height:1;color:var(--copper);flex:none}
+  .name{font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(22,19,16,.46);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chips{display:flex;gap:.28rem;flex:none}
+  .chips i{width:.62rem;height:.62rem;border-radius:50%;box-shadow:0 0 0 1px rgba(22,19,16,.12)}
+
+  .stage{position:relative;height:15.5rem;border-radius:1rem;overflow:hidden;
+    background:var(--stage);display:grid;place-items:center;
+    box-shadow:inset 0 0 0 1px rgba(22,19,16,.05)}
+  .stage::before{content:"";position:absolute;inset:-30%;z-index:0;
+    background:
+      radial-gradient(closest-side circle at 28% 32%, var(--blob1), transparent 72%),
+      radial-gradient(closest-side circle at 74% 68%, var(--blob2), transparent 72%);
+    filter:blur(22px);opacity:.95}
+
+  .scene{position:relative;z-index:1;width:100%;height:100%;display:grid;place-items:center;
+    perspective:950px}
+  .cube{--s:118px;--speed:19s;--tilt:-24deg;position:relative;width:var(--s);height:var(--s);
+    transform-style:preserve-3d;animation:spin var(--speed) linear infinite}
+  @keyframes spin{
+    from{transform:rotateX(var(--tilt)) rotateY(0deg)}
+    to{transform:rotateX(var(--tilt)) rotateY(360deg)}
+  }
+  .stage:hover .cube{animation-play-state:paused}
+
+  .f{position:absolute;inset:0;display:grid;place-items:center;
+    background:var(--face);border:1px solid var(--edge);
+    box-shadow:inset 0 0 26px var(--glow), inset 0 1px 0 rgba(255,255,255,.4);
+    backdrop-filter:blur(10px) saturate(1.2);
+    -webkit-backdrop-filter:blur(10px) saturate(1.2);
+    color:var(--text);font-family:var(--ff,var(--sans));font-weight:800;
+    font-size:var(--fs,.78rem);letter-spacing:var(--ls,.24em);text-indent:var(--ls,.24em);
+    white-space:nowrap;user-select:none}
+  .f::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+    background:linear-gradient(140deg, rgba(255,255,255,.30), rgba(255,255,255,.08) 58%, rgba(255,255,255,.18))}
+  .f-front{transform:translateZ(calc(var(--s)/2))}
+  .f-back{transform:rotateY(180deg) translateZ(calc(var(--s)/2))}
+  .f-right{transform:rotateY(90deg) translateZ(calc(var(--s)/2))}
+  .f-left{transform:rotateY(-90deg) translateZ(calc(var(--s)/2))}
+  .f-top{transform:rotateX(90deg) translateZ(calc(var(--s)/2))}
+  .f-bottom{transform:rotateX(-90deg) translateZ(calc(var(--s)/2))}
+
+  footer.foot{padding:0 0 4rem;color:rgba(22,19,16,.5);font-size:.78rem}
+  footer.foot b{color:var(--copper)}
+
+  /* ---------- 07.1 медь · крем ---------- */
+  .v1{--stage:#efe6d9;--blob1:#e1a570;--blob2:#d6c6b1;
+    --face:rgba(184,120,73,.24);--edge:rgba(143,90,52,.85);--text:#6f4529;
+    --glow:rgba(225,165,112,.45);--ff:var(--serif);--ls:.18em;--fs:.8rem;
+    --s:120px;--speed:19s;--tilt:-24deg}
+
+  /* ---------- 07.2 чернила · песок ---------- */
+  .v2{--stage:#e6dccd;--blob1:#d6c6b1;--blob2:#b87849;
+    --face:rgba(22,19,16,.18);--edge:rgba(22,19,16,.72);--text:#161310;
+    --glow:rgba(22,19,16,.16);--ff:var(--sans);--ls:.28em;--fs:.72rem;
+    --s:112px;--speed:16s;--tilt:-20deg}
+
+  /* ---------- 07.3 олива · мел ---------- */
+  .v3{--stage:#e9e2d2;--blob1:#8a917a;--blob2:#d6c6b1;
+    --face:rgba(111,117,95,.26);--edge:rgba(88,94,74,.9);--text:#4b5140;
+    --glow:rgba(111,117,95,.35);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:124px;--speed:22s;--tilt:-26deg}
+
+  /* ---------- 07.4 дым · тёмный ---------- */
+  .v4{--stage:#1a1714;--blob1:#4a423a;--blob2:#7a6d5c;
+    --face:rgba(255,255,255,.10);--edge:rgba(255,255,255,.30);--text:#eee6da;
+    --glow:rgba(255,255,255,.16);--ff:var(--sans);--ls:.3em;--fs:.7rem;
+    --s:116px;--speed:20s;--tilt:-22deg}
+
+  /* ---------- 07.5 изумруд · ночь ---------- */
+  .v5{--stage:#0f1a15;--blob1:#1f5c47;--blob2:#6f755f;
+    --face:rgba(56,150,116,.20);--edge:rgba(126,224,184,.55);--text:#d8f0e4;
+    --glow:rgba(56,190,140,.35);--ff:var(--sans);--ls:.26em;--fs:.72rem;
+    --s:114px;--speed:23s;--tilt:-28deg}
+
+  /* ---------- 07.6 ультрамарин ---------- */
+  .v6{--stage:#e8e4d8;--blob1:#2f4f8f;--blob2:#9fb0cc;
+    --face:rgba(47,79,143,.22);--edge:rgba(47,79,143,.8);--text:#1e3462;
+    --glow:rgba(47,79,143,.3);--ff:var(--sans);--ls:.24em;--fs:.76rem;
+    --s:118px;--speed:17s;--tilt:-24deg}
+
+  /* ---------- 07.7 терракота ---------- */
+  .v7{--stage:#efe1d3;--blob1:#c06a4a;--blob2:#e1a570;
+    --face:rgba(192,106,74,.24);--edge:rgba(160,78,52,.85);--text:#8a3f28;
+    --glow:rgba(192,106,74,.4);--ff:var(--serif);--ls:.18em;--fs:.8rem;
+    --s:122px;--speed:21s;--tilt:-25deg}
+
+  /* ---------- 07.8 пудра · слива ---------- */
+  .v8{--stage:#f1e6e2;--blob1:#d8a7a0;--blob2:#c9b0a6;
+    --face:rgba(216,167,160,.3);--edge:rgba(160,110,110,.7);--text:#6b3f45;
+    --glow:rgba(216,167,160,.45);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:116px;--speed:24s;--tilt:-23deg}
+
+  /* ---------- 07.9 неон · кибер ---------- */
+  .v9{--stage:#0b0d12;--blob1:#18d0d0;--blob2:#d02a9c;
+    --face:rgba(24,208,208,.12);--edge:rgba(40,245,245,.72);--text:#e6ffff;
+    --glow:rgba(24,220,220,.55);--ff:var(--sans);--ls:.34em;--fs:.7rem;
+    --s:118px;--speed:14s;--tilt:-20deg}
+
+  /* ---------- 07.10 лёд ---------- */
+  .v10{--stage:#dfe9ee;--blob1:#b9d6e2;--blob2:#ffffff;
+    --face:rgba(255,255,255,.44);--edge:rgba(140,182,205,.85);--text:#2b4a58;
+    --glow:rgba(255,255,255,.6);--ff:var(--sans);--ls:.24em;--fs:.74rem;
+    --s:126px;--speed:26s;--tilt:-27deg}
+
+  /* ---------- 07.11 голография ---------- */
+  .v11{--stage:#141018;--blob1:#b87849;--blob2:#6f755f;
+    --face:linear-gradient(135deg, rgba(225,165,112,.42), rgba(111,117,95,.34) 42%,
+      rgba(214,198,177,.42) 68%, rgba(184,120,73,.4));
+    --edge:rgba(255,255,255,.38);--text:#ffffff;
+    --glow:rgba(225,165,112,.4);--ff:var(--sans);--ls:.26em;--fs:.72rem;
+    --s:120px;--speed:18s;--tilt:-24deg}
+
+  /* ---------- 07.12 монохром ---------- */
+  .v12{--stage:#f4f2ee;--blob1:#e2ded6;--blob2:#ffffff;
+    --face:rgba(20,20,20,.09);--edge:rgba(20,20,20,.55);--text:#111111;
+    --glow:rgba(20,20,20,.1);--ff:var(--sans);--ls:.32em;--fs:.7rem;
+    --s:122px;--speed:25s;--tilt:-25deg}
+
+  /* ---------- 07.13 латунь · чёрный ---------- */
+  .v13{--stage:#0e0c0a;--blob1:#8f5a34;--blob2:#b87849;
+    --face:rgba(184,120,73,.16);--edge:rgba(225,165,112,.78);--text:#f0cfa8;
+    --glow:rgba(225,165,112,.4);--ff:var(--serif);--ls:.2em;--fs:.78rem;
+    --s:114px;--speed:20s;--tilt:-21deg}
+
+  /* ---------- 07.14 графит · лайм ---------- */
+  .v14{--stage:#1c1d1a;--blob1:#3a3d34;--blob2:#a8c46a;
+    --face:rgba(255,255,255,.08);--edge:rgba(168,196,106,.62);--text:#dce8c4;
+    --glow:rgba(168,196,106,.28);--ff:var(--sans);--ls:.3em;--fs:.7rem;
+    --s:118px;--speed:22s;--tilt:-29deg}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <a class="back" href="/brand-cube.html">&larr; все 26 концептов</a>
+  <br>
+  <span class="eyebrow">07 · переработка</span>
+  <h1>FORMA<br><em>на гранях.</em></h1>
+  <p class="lead">Куб из концепта <b>07</b>: надпись FORMA на плоскостях, подпись снизу убрана, грани — матовое стекло. Ниже <b>14 цветовых вариаций</b> одного и того же дизайна. Скажите номер — например <b>«07.6»</b>.</p>
+</header>
+
+<main class="wrap">
+  <section class="grid">
+
+    <!-- 07.1 -->
+    <article class="card v1">
+      <div class="meta">
+        <div class="id"><span class="num">07.1</span><span class="name">медь · крем</span></div>
+        <div class="chips"><i style="background:#e1a570"></i><i style="background:#b87849"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.2 -->
+    <article class="card v2">
+      <div class="meta">
+        <div class="id"><span class="num">07.2</span><span class="name">чернила · песок</span></div>
+        <div class="chips"><i style="background:#d6c6b1"></i><i style="background:#161310"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.3 -->
+    <article class="card v3">
+      <div class="meta">
+        <div class="id"><span class="num">07.3</span><span class="name">олива · мел</span></div>
+        <div class="chips"><i style="background:#8a917a"></i><i style="background:#6f755f"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.4 -->
+    <article class="card v4">
+      <div class="meta">
+        <div class="id"><span class="num">07.4</span><span class="name">дым · тёмный</span></div>
+        <div class="chips"><i style="background:#4a423a"></i><i style="background:#eee6da"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.5 -->
+    <article class="card v5">
+      <div class="meta">
+        <div class="id"><span class="num">07.5</span><span class="name">изумруд · ночь</span></div>
+        <div class="chips"><i style="background:#1f5c47"></i><i style="background:#7ee0b8"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.6 -->
+    <article class="card v6">
+      <div class="meta">
+        <div class="id"><span class="num">07.6</span><span class="name">ультрамарин</span></div>
+        <div class="chips"><i style="background:#2f4f8f"></i><i style="background:#9fb0cc"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.7 -->
+    <article class="card v7">
+      <div class="meta">
+        <div class="id"><span class="num">07.7</span><span class="name">терракота</span></div>
+        <div class="chips"><i style="background:#c06a4a"></i><i style="background:#e1a570"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.8 -->
+    <article class="card v8">
+      <div class="meta">
+        <div class="id"><span class="num">07.8</span><span class="name">пудра · слива</span></div>
+        <div class="chips"><i style="background:#d8a7a0"></i><i style="background:#6b3f45"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.9 -->
+    <article class="card v9">
+      <div class="meta">
+        <div class="id"><span class="num">07.9</span><span class="name">неон · кибер</span></div>
+        <div class="chips"><i style="background:#18d0d0"></i><i style="background:#d02a9c"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.10 -->
+    <article class="card v10">
+      <div class="meta">
+        <div class="id"><span class="num">07.10</span><span class="name">лёд</span></div>
+        <div class="chips"><i style="background:#b9d6e2"></i><i style="background:#ffffff"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.11 -->
+    <article class="card v11">
+      <div class="meta">
+        <div class="id"><span class="num">07.11</span><span class="name">голография</span></div>
+        <div class="chips"><i style="background:#e1a570"></i><i style="background:#6f755f"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.12 -->
+    <article class="card v12">
+      <div class="meta">
+        <div class="id"><span class="num">07.12</span><span class="name">монохром</span></div>
+        <div class="chips"><i style="background:#e2ded6"></i><i style="background:#111111"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.13 -->
+    <article class="card v13">
+      <div class="meta">
+        <div class="id"><span class="num">07.13</span><span class="name">латунь · чёрный</span></div>
+        <div class="chips"><i style="background:#8f5a34"></i><i style="background:#f0cfa8"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+    <!-- 07.14 -->
+    <article class="card v14">
+      <div class="meta">
+        <div class="id"><span class="num">07.14</span><span class="name">графит · лайм</span></div>
+        <div class="chips"><i style="background:#a8c46a"></i><i style="background:#3a3d34"></i></div>
+      </div>
+      <div class="stage">
+        <div class="scene"><div class="cube">
+          <div class="f f-front">FORMA</div><div class="f f-back">FORMA</div>
+          <div class="f f-right">FORMA</div><div class="f f-left">FORMA</div>
+          <div class="f f-top"></div><div class="f f-bottom"></div>
+        </div></div>
+      </div>
+    </article>
+
+  </section>
+</main>
+
+<footer class="foot wrap">
+  <p>Наведите на куб — вращение остановится. Напишите номер выбранной вариации, и я доведу её до финала: размеры, носители, анимация для сайта.</p>
+</footer>
+
+</body>
+</html>

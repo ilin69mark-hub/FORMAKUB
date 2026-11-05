@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# Next.js / сборки
+.next
+out
+build
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# Локальные секреты и окружение (.env не коммитится, пример — коммитится)
+.env
+.env.*
+!.env.example
+
+# ОС и временные файлы
+.DS_Store
+*.tmp
+*.log
+
+# Данные приложения отслеживаются (projects.json, leads.json, .gitkeep):
+# важно для восстановления и baseline-сравнений (CA-T-001, CA-RISK-015).
