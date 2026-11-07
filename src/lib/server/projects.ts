@@ -1,9 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { normalizeKitchen } from "@/lib/configurator/defaults";
 import { calculatePrice } from "@/lib/configurator/pricing";
+import { storedProjectSchema } from "@/lib/configurator/schema";
+import {
+  BUILD_CALC_VERSION,
+  SUPPORTED_SCHEMA_VERSION,
+} from "@/lib/configurator/versions";
 import { isConfigValid, validateConfig } from "@/lib/configurator/validation";
 import type { FurnitureConfig, StoredProject } from "@/lib/configurator/types";
-import { readCollection, updateCollection } from "./store";
+import { applyMigrations, schemaVersionOf } from "./migrations";
+import { readCollectionStatus, updateCollection } from "./store";
 
 function projectId(): string {
   const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -38,9 +44,12 @@ export async function saveProject(input: {
         id = projectId();
         attempt += 1;
       }
+      // Штампы версий (CA-T-107): структура записи и сборка движка.
       const stored: StoredProject = {
         id,
         config: input.config,
+        schemaVersion: SUPPORTED_SCHEMA_VERSION,
+        calcVersion: BUILD_CALC_VERSION,
         price,
         createdAt: now,
         updatedAt: now,
@@ -52,22 +61,111 @@ export async function saveProject(input: {
   return { ok: true, project };
 }
 
-export async function getProject(id: string): Promise<StoredProject | null> {
-  const items = await readCollection<StoredProject>("projects.json");
-  const project = items.find((item) => item.id === id) ?? null;
-  if (!project) return null;
+/**
+ * Результат чтения проекта (CA-T-106, дизайн §12 S6, OI-064):
+ * невалидный или несовместимый проект отдаётся с пометкой, а не теряется
+ * за `null`-404; повреждённый файл квартируется, а не роняет чтение в 500.
+ */
+export type ProjectReadResult =
+  | { status: "not_found" }
+  | { status: "quarantined"; reason: string }
+  | { status: "ok"; project: StoredProject; versionsInferred: boolean }
+  | { status: "unsupported"; project: StoredProject; reason: string };
 
-  const config =
-    project.config.kind === "kitchen"
-      ? normalizeKitchen(project.config)
-      : project.config;
-  const issues = validateConfig(config);
-  if (!isConfigValid(issues)) return null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  return {
-    ...project,
-    config,
-    price: calculatePrice(config),
-    updatedAt: project.updatedAt,
-  };
+/** Конфиг узнаваем текущей схемой (есть поля, без которых обработка падает). */
+function isRecognisedConfig(config: unknown): config is FurnitureConfig {
+  if (!isRecord(config)) return false;
+  if (config.kind === "kitchen") return Array.isArray(config.modules);
+  if (config.kind === "wardrobe") return Array.isArray(config.sections);
+  return false;
+}
+
+export async function getProject(id: string): Promise<ProjectReadResult> {
+  const read = await readCollectionStatus<unknown>("projects.json");
+  if (read.status === "missing") return { status: "not_found" };
+  if (read.status === "corrupt") {
+    return { status: "quarantined", reason: read.reason };
+  }
+
+  const raw = read.items.find(
+    (item): item is Record<string, unknown> => isRecord(item) && item.id === id,
+  );
+  if (!raw) return { status: "not_found" };
+
+  const parsed = storedProjectSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      status: "quarantined",
+      reason: `запись проекта повреждена (${
+        issue ? `${issue.path.join(".")}: ${issue.message}` : "нет обязательных полей"
+      })`,
+    };
+  }
+
+  // raw-режим: содержимое config/price проверяется ниже, а не отбрасывается.
+  const stored = parsed.data as unknown as StoredProject;
+  const from = schemaVersionOf(stored);
+  if (from > SUPPORTED_SCHEMA_VERSION) {
+    return {
+      status: "unsupported",
+      project: stored,
+      reason: `структура проекта v${from} новее поддерживаемой v${SUPPORTED_SCHEMA_VERSION}`,
+    };
+  }
+
+  let migrated: StoredProject;
+  try {
+    migrated = applyMigrations(stored).project;
+  } catch (error) {
+    return {
+      status: "unsupported",
+      project: stored,
+      reason: `миграция структуры не выполнена: ${(error as Error).message}`,
+    };
+  }
+
+  if (!isRecognisedConfig(migrated.config)) {
+    return {
+      status: "unsupported",
+      project: migrated,
+      reason: "конфигурация проекта не распознана текущей схемой",
+    };
+  }
+
+  try {
+    const config =
+      migrated.config.kind === "kitchen"
+        ? normalizeKitchen(migrated.config)
+        : migrated.config;
+    const issues = validateConfig(config);
+    if (!isConfigValid(issues)) {
+      return {
+        status: "unsupported",
+        project: migrated,
+        reason: "конфигурация не проходит текущие правила валидации",
+      };
+    }
+    return {
+      status: "ok",
+      project: {
+        ...migrated,
+        config,
+        price: calculatePrice(config),
+        updatedAt: migrated.updatedAt,
+      },
+      // Запись без schemaVersion → v1 (дизайн §12 S1), поле не дозаписывается.
+      versionsInferred: parsed.data.schemaVersion === undefined,
+    };
+  } catch {
+    return {
+      status: "unsupported",
+      project: migrated,
+      reason: "конфигурация проекта не может быть обработана текущей схемой",
+    };
+  }
 }

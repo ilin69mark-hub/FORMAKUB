@@ -130,13 +130,30 @@ export function ConfiguratorStudio({
             cache: "no-store",
           });
           const data = (await response.json().catch(() => null)) as
-            | { ok: boolean; project?: { config: FurnitureConfig }; error?: string }
+            | {
+                ok: boolean;
+                project?: {
+                  config: FurnitureConfig;
+                  compatibility?: string;
+                  reason?: string;
+                };
+                error?: string;
+              }
             | null;
           if (!response.ok || !data?.ok || !data.project) {
             if (alive) {
               setLoadError(
                 data?.error ??
                   "Проект не найден. Можно продолжить с чистого листа или восстановить черновик.",
+              );
+            }
+          } else if (data.project.compatibility) {
+            // Проект отдан в raw-режиме (CA-T-106): не грузим конфиг,
+            // показываем причину несовместимости.
+            if (alive) {
+              setLoadError(
+                data.project.reason ??
+                  "Сохранённый проект несовместим с текущей версией и требует ручной миграции.",
               );
             }
           } else if (data.project.config.kind !== type) {

@@ -274,6 +274,13 @@ export interface StoredLead extends LeadPayload {
 export interface StoredProject {
   id: string;
   config: FurnitureConfig;
+  /**
+   * Версия структуры записи (дизайн §5.1, CA-T-104).
+   * Отсутствует у старых проектов — при чтении трактуется как 1 (§5.4).
+   */
+  schemaVersion?: number;
+  /** Версия сборки движка, выполнившей расчёт (§5.1, CA-T-107). */
+  calcVersion?: string;
   price: PriceBreakdown;
   createdAt: string;
   updatedAt: string;

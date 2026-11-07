@@ -216,6 +216,24 @@ export const projectIdSchema = z
   .trim()
   .regex(/^[a-z0-9]{8}$/);
 
+/**
+ * Структурная проверка записи проекта из хранилища (CA-T-104, CA-T-106).
+ *
+ * Содержимое `config` и `price` здесь не разбирается: несовместимая или
+ * устаревшая структура должна читаться в режиме raw с пометкой
+ * `compatibility` (дизайн §12 S6), а не отбрасываться. Поля `schemaVersion`
+ * и `calcVersion` отсутствуют у старых записей — это валидно (§5.4).
+ */
+export const storedProjectSchema = z.looseObject({
+  id: z.string().trim().min(1).max(40),
+  config: z.looseObject({}),
+  price: z.looseObject({}),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  schemaVersion: z.number().int().min(1).optional(),
+  calcVersion: z.string().min(1).optional(),
+});
+
 export function safeParseConfig(value: unknown) {
   return furnitureConfigSchema.safeParse(value);
 }
