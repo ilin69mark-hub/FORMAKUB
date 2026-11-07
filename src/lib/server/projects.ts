@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { normalizeKitchen } from "@/lib/configurator/defaults";
 import { calculatePrice } from "@/lib/configurator/pricing";
-import { storedProjectSchema } from "@/lib/configurator/schema";
+import { safeParseConfig, storedProjectSchema } from "@/lib/configurator/schema";
 import {
   BUILD_CALC_VERSION,
   SUPPORTED_SCHEMA_VERSION,
@@ -69,7 +69,13 @@ export async function saveProject(input: {
 export type ProjectReadResult =
   | { status: "not_found" }
   | { status: "quarantined"; reason: string }
-  | { status: "ok"; project: StoredProject; versionsInferred: boolean }
+  | {
+      status: "ok";
+      project: StoredProject;
+      versionsInferred: boolean;
+      /** §12 S3/S9: у записи нет `calcVersion` — сборка не присваивается молча. */
+      calcVersionUnknown: boolean;
+    }
   | { status: "unsupported"; project: StoredProject; reason: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -138,8 +144,14 @@ export async function getProject(id: string): Promise<ProjectReadResult> {
   }
 
   try {
-    const config =
-      migrated.config.kind === "kitchen"
+    // Строгий разбор (Zod): подставляет default-поля и нормализует легаси-
+    // идентификаторы через COUNTERTOP_LEGACY_MAP (§12 S5). При провале —
+    // мягкая ветка: неизвестные поля не отбрасываются молча (§12 S8),
+    // решение о совместимости принимает validateConfig.
+    const strict = safeParseConfig(migrated.config);
+    const config: FurnitureConfig = strict.success
+      ? strict.data
+      : migrated.config.kind === "kitchen"
         ? normalizeKitchen(migrated.config)
         : migrated.config;
     const issues = validateConfig(config);
@@ -160,6 +172,8 @@ export async function getProject(id: string): Promise<ProjectReadResult> {
       },
       // Запись без schemaVersion → v1 (дизайн §12 S1), поле не дозаписывается.
       versionsInferred: parsed.data.schemaVersion === undefined,
+      // §12 S3/S9: текущая сборка проекту молча не присваивается.
+      calcVersionUnknown: migrated.calcVersion == null,
     };
   } catch {
     return {

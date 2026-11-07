@@ -162,3 +162,102 @@ describe("повреждённое хранилище (CA-T-106, I-09)", () => {
     expect(readFileSync(path.join(dir, "projects.json"), "utf8")).toBe(raw);
   });
 });
+
+/**
+ * Фикстуры сценариев совместимости (дизайн §12.1) — CA-T-109.
+ * S4/S7 (priceVersion) и полный S8 (отчёт extraFields) зависят от Фаз 2–3
+ * и ADR-06 — здесь фиксируется только отсутствие молчаливого присвоения.
+ */
+describe("сценарии совместимости §12 (CA-T-109)", () => {
+  it("S1: нет schemaVersion при config.version=1 → v1, versionsInferred", async () => {
+    writeProjects([stored()]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.versionsInferred).toBe(true);
+    expect(result.project.schemaVersion).toBeUndefined();
+  });
+
+  it("S2: нет config.version вовсе → чтение проходит как v1", async () => {
+    const config = defaultKitchen() as unknown as Record<string, unknown>;
+    delete config.version;
+    writeProjects([{ id: "abcdefgh", config, price: calculatePrice(defaultKitchen()), createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.project.schemaVersion).toBeUndefined();
+    expect(result.versionsInferred).toBe(true);
+  });
+
+  it("S3/S9: нет calcVersion → calcVersionUnknown, сборка молча не присваивается", async () => {
+    writeProjects([stored({ schemaVersion: 1 })]);
+    const before = readFileSync(path.join(dir, "projects.json"), "utf8");
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.calcVersionUnknown).toBe(true);
+    expect(result.project.calcVersion).toBeUndefined();
+    // файл не изменяется чтением (I-09)
+    expect(readFileSync(path.join(dir, "projects.json"), "utf8")).toBe(before);
+
+    writeProjects([stored({ schemaVersion: 1, calcVersion: "calc-2026.1.0" })]);
+    const withVersion = await getProject("abcdefgh");
+    expect(withVersion.status).toBe("ok");
+    if (withVersion.status !== "ok") return;
+    expect(withVersion.calcVersionUnknown).toBe(false);
+  });
+
+  it("S4/S7: priceVersion молча не присваивается — хранится только факт цены", async () => {
+    writeProjects([stored({ schemaVersion: 1 })]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect("priceVersion" in result.project).toBe(false);
+
+    const onDisk = JSON.parse(
+      readFileSync(path.join(dir, "projects.json"), "utf8"),
+    ) as Array<Record<string, unknown>>;
+    expect(onDisk[0].priceVersion).toBeUndefined();
+  });
+
+  it("S5: легаси-идентификатор столешницы нормализуется при чтении", async () => {
+    const config = { ...defaultKitchen(), countertop: "laminate" as const };
+    writeProjects([{ id: "abcdefgh", config, price: calculatePrice(defaultKitchen()), createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.project.config.kind).toBe("kitchen");
+    if (result.project.config.kind !== "kitchen") return;
+    expect(result.project.config.countertop).toBe("compact_hpl");
+  });
+
+  it("S6: структура устарела/новее поддерживаемой → raw с пометкой, не 404", async () => {
+    writeProjects([stored({ schemaVersion: SUPPORTED_SCHEMA_VERSION + 1 })]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("unsupported");
+    if (result.status !== "unsupported") return;
+    expect(result.project.id).toBe("abcdefgh");
+    expect(result.reason).toMatch(/новее поддерживаемой/);
+  });
+
+  it("S8: неизвестные поля конфига не отбрасываются молча", async () => {
+    const config = {
+      ...defaultKitchen(),
+      legacyFieldRemovedLongAgo: "keep-me",
+    } as unknown as ReturnType<typeof defaultKitchen>;
+    writeProjects([{ id: "abcdefgh", config, price: calculatePrice(defaultKitchen()), createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }]);
+
+    const result = await getProject("abcdefgh");
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(
+      (result.project.config as unknown as Record<string, unknown>).legacyFieldRemovedLongAgo,
+    ).toBe("keep-me");
+  });
+});

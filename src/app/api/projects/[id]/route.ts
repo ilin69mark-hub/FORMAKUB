@@ -67,6 +67,7 @@ export async function GET(
           price: result.project.price,
           updatedAt: result.project.updatedAt,
           versionsInferred: result.versionsInferred,
+          calcVersionUnknown: result.calcVersionUnknown,
         },
       },
       {

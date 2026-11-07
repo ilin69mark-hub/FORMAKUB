@@ -4,13 +4,23 @@ import { randomBytes } from "node:crypto";
 
 const locks = new Map<string, Promise<unknown>>();
 
-/** Каталог данных; тесты переопределяют его через `FORMAKUB_DATA_DIR`. */
-function dataDir(): string {
-  return process.env.FORMAKUB_DATA_DIR ?? path.join(process.cwd(), "data");
+/**
+ * Путь к файлу коллекции. Каталог по умолчанию задан статически, чтобы сборка
+ * трассировала только `data/`; тесты переопределяют каталог через
+ * `FORMAKUB_DATA_DIR`.
+ */
+function collectionPath(file: string): string {
+  const override = process.env.FORMAKUB_DATA_DIR;
+  if (override) return path.join(override, file);
+  return path.join(process.cwd(), "data", file);
 }
 
-async function ensureDir(): Promise<void> {
-  await mkdir(dataDir(), { recursive: true });
+function dataDirOfFile(file: string): string {
+  return path.dirname(collectionPath(file));
+}
+
+async function ensureDir(file: string): Promise<void> {
+  await mkdir(dataDirOfFile(file), { recursive: true });
 }
 
 export type CollectionRead<T> =
@@ -30,7 +40,9 @@ export async function readCollectionStatus<T>(
 ): Promise<CollectionRead<T>> {
   let raw: string;
   try {
-    raw = await readFile(path.join(dataDir(), file), "utf8");
+    // turbopackIgnore: путь собирается через collectionPath() — каталог данных
+    // задан статически (data/), переопределяется только тестами.
+    raw = await readFile(/* turbopackIgnore: true */ collectionPath(file), "utf8");
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return { status: "missing" };
@@ -66,8 +78,8 @@ export async function readCollection<T>(file: string): Promise<T[]> {
 }
 
 async function writeCollection<T>(file: string, items: T[]): Promise<void> {
-  await ensureDir();
-  const target = path.join(dataDir(), file);
+  await ensureDir(file);
+  const target = collectionPath(file);
   const temp = `${target}.${randomBytes(4).toString("hex")}.tmp`;
   await writeFile(temp, JSON.stringify(items, null, 2), "utf8");
   await rename(temp, target);
@@ -103,5 +115,5 @@ export async function updateCollection<T, R>(
 }
 
 export function dataFilePath(file: string): string {
-  return path.join(dataDir(), file);
+  return collectionPath(file);
 }
