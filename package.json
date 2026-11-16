@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "preflight": "node scripts/deploy-preflight.mjs",
+    "restore-drill": "node scripts/restore-drill.mjs",
+    "smoke:browser": "bash scripts/run-browser-smoke.sh"
   },
   "dependencies": {
     "lucide-react": "^1.62.0",

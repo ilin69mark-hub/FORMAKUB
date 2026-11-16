@@ -7,6 +7,7 @@ import {
   findSupportSystem,
 } from "@/content/supports";
 import type { SupportSystem } from "@/content/supports";
+import type { CalculationInputs } from "./contract";
 import type {
   KitchenConfig,
   KitchenModule,
@@ -287,7 +288,8 @@ function supportsForModule(
   };
 }
 
-export function computeSupports(config: KitchenConfig): SupportPlan {
+export function computeSupports(config: KitchenConfig, _inputs?: CalculationInputs): SupportPlan {
+  void _inputs; // зарезервировано для CA-T-304/306; текущий источник — content.
   const system = findSupportSystem(config.supports?.systemId);
   const maxSpanCm = config.supports?.maxSpanCm ?? system.maxSpanCm;
   const maxLoadKgPerLeg = config.supports?.maxLoadKgPerLeg ?? system.maxLoadKgPerLeg;

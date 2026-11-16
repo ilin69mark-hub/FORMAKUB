@@ -47,11 +47,12 @@ describe("цепочка миграций (CA-T-105)", () => {
     expect(step!.migrate(project)).toEqual(project);
   });
 
-  it("до поддерживаемой версии ничего не применяет и запись не меняет", () => {
+  it("v1 мигрирует до поддерживаемой v2 без изменения config", () => {
     const project = record();
     const outcome = applyMigrations(project);
-    expect(outcome.applied).toEqual([]);
-    expect(outcome.project).toEqual(project);
+    expect(outcome.applied).toEqual([2]);
+    expect(outcome.project.schemaVersion).toBe(2);
+    expect(outcome.project.config).toEqual(project.config);
   });
 
   it("пустая ступень v1→v2 идемпотентна: двойной прогон даёт тот же результат", () => {

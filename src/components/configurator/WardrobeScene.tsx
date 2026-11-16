@@ -3,6 +3,12 @@
 import { useId } from "react";
 import { BODY_MATERIALS, FACADE_MATERIALS, WARDROBE_LIMITS } from "@/content/catalog";
 import { shade } from "@/lib/color";
+import {
+  WARDROBE_PLINTH_HEIGHT_CM,
+} from "@/lib/configurator/facade-geometry";
+import { FIXED_BODY_MATERIAL_ID } from "@/lib/configurator/materials";
+import { wardrobeGeometry } from "@/lib/configurator/wardrobe-geometry";
+import { wardrobeFacadeGeometry } from "@/lib/configurator/wardrobe-facade-geometry";
 import { SelectionOutline } from "@/components/configurator/SelectionOutline";
 import type { WardrobeConfig, WardrobeSection } from "@/lib/configurator/types";
 
@@ -37,72 +43,6 @@ function finishFor(
   return option?.finishes.find((item) => item.id === finish)?.hex ?? option?.finishes[0]?.hex ?? fallback;
 }
 
-function doorCount(width: number): number {
-  return width > 60 ? 2 : 1;
-}
-
-function HandleMark({
-  x,
-  y,
-  height,
-  kind,
-  side,
-}: {
-  x: number;
-  y: number;
-  height: number;
-  kind: WardrobeConfig["handle"];
-  side: "left" | "right";
-}) {
-  if (kind === "none") return null;
-  if (kind === "knob") {
-    return (
-      <g>
-        <circle cx={x} cy={y + height / 2} r={1.15} fill="#b89b6c" />
-        <circle cx={x - 0.3} cy={y + height / 2 - 0.3} r={0.3} fill="#f0dfbe" />
-      </g>
-    );
-  }
-  if (kind === "profile") {
-    return (
-      <line
-        x1={x}
-        x2={x}
-        y1={y + height * 0.28}
-        y2={y + height * 0.72}
-        stroke="#8b7c68"
-        strokeWidth={0.9}
-        strokeLinecap="round"
-        opacity={0.6}
-      />
-    );
-  }
-  const direction = side === "left" ? 1 : -1;
-  return (
-    <g>
-      <line
-        x1={x + direction * 1.8}
-        x2={x + direction * 1.8}
-        y1={y + height / 2 - 9}
-        y2={y + height / 2 + 9}
-        stroke="#9a7a4f"
-        strokeWidth={1.2}
-        strokeLinecap="round"
-      />
-      <line
-        x1={x + direction * 1.5}
-        x2={x + direction * 1.5}
-        y1={y + height / 2 - 9}
-        y2={y + height / 2 + 9}
-        stroke="#e7cfa9"
-        strokeWidth={0.3}
-        strokeLinecap="round"
-        opacity={0.8}
-      />
-    </g>
-  );
-}
-
 export function WardrobeScene({
   config,
   selectedId,
@@ -113,13 +53,12 @@ export function WardrobeScene({
   className,
 }: SceneProps) {
   const uid = useId().replace(/[:]/g, "");
-  const width = Math.max(
-    60,
-    config.sections.reduce((sum, section) => sum + safe(section.width), 0),
-  );
+  const geometry = wardrobeGeometry(config);
+  const facadeGeometry = wardrobeFacadeGeometry(config, geometry);
+  const width = Math.max(60, geometry.widthMm / 10);
   const height = safe(config.height, 240);
   const floorY = TOP + height;
-  const plinth = config.plinth ? WARDROBE_LIMITS.plinthHeight : 0;
+  const plinth = config.plinth ? WARDROBE_PLINTH_HEIGHT_CM : 0;
   const facadeColor = finishFor(
     FACADE_MATERIALS,
     config.facadeMaterial,
@@ -128,22 +67,22 @@ export function WardrobeScene({
   );
   const bodyColor = finishFor(
     BODY_MATERIALS,
-    config.bodyMaterial,
+    FIXED_BODY_MATERIAL_ID,
     config.bodyFinish,
     "#d8c3a5",
   );
-  const isGlass = config.facadeMaterial === "glass";
 
-  const layout = config.sections.reduce<{ section: WardrobeSection; x: number }[]>(
-    (acc, section) => {
-      const previous = acc[acc.length - 1];
-      const x = previous
-        ? previous.x + safe(previous.section.width, 60)
-        : MARGIN;
-      return [...acc, { section, x }];
-    },
-    [],
-  );
+  const layout = config.sections.slice(0, geometry.sections.length).map((section, index) => ({
+    section,
+    widthCm: (geometry.sections[index]?.innerWidthMm ?? 0) / 10,
+    x:
+      index === 0
+        ? MARGIN + geometry.bodyThicknessMm / 10
+        : MARGIN +
+          ((geometry.partition?.positionMm ?? 0) +
+            (geometry.partition?.thicknessMm ?? 0)) /
+            10,
+  }));
 
   // Geometry of the selected section, resolved from the layout so the
   // highlight can be drawn above the shadow-filtered group (filters clip
@@ -155,7 +94,7 @@ export function WardrobeScene({
     return {
       x: entry.x,
       y: TOP,
-      width: safe(entry.section.width, 60),
+      width: entry.widthCm,
       height,
     };
   })();
@@ -163,7 +102,7 @@ export function WardrobeScene({
   const interactiveProps = (section: WardrobeSection) => ({
     role: onSelect ? ("button" as const) : undefined,
     tabIndex: onSelect ? 0 : undefined,
-    "aria-label": `Секция шириной ${section.width} см, полок: ${section.shelves.length}, ящиков: ${section.drawers}`,
+    "aria-label": `Секция шириной ${layout.find((entry) => entry.section.id === section.id)?.widthCm ?? 0} см, полок: ${section.shelves.length}, ящиков: ${section.drawers}`,
     onClick: onSelect ? () => onSelect(section.id) : undefined,
     onKeyDown: onSelect
       ? (event: React.KeyboardEvent) => {
@@ -176,29 +115,14 @@ export function WardrobeScene({
     style: onSelect ? { cursor: "pointer" } : undefined,
   });
 
-  const renderSection = (section: WardrobeSection, x: number) => {
-    const sectionWidth = safe(section.width, 60);
-    const interiorX = x + 1.4;
-    const interiorWidth = sectionWidth - 2.8;
-    const interiorTop = TOP + 1.4;
-    const interiorBottom = floorY - plinth - 1.2;
-    const doors = doorCount(sectionWidth);
-    const doorGap = 0.55;
-    const doorWidth =
-      (interiorWidth - doorGap * (doors - 1)) / doors;
+  const renderSection = (section: WardrobeSection, x: number, sectionWidth: number) => {
+    const interiorX = x;
+    const interiorWidth = sectionWidth;
+    const interiorTop = TOP + geometry.bodyThicknessMm / 10;
+    const interiorBottom = floorY - plinth - geometry.bodyThicknessMm / 10;
 
     return (
       <g key={section.id} {...interactiveProps(section)}>
-        <rect
-          x={x}
-          y={TOP}
-          width={sectionWidth}
-          height={height}
-          fill={`url(#${uid}-body)`}
-          stroke={shade(bodyColor, -34)}
-          strokeWidth={0.4}
-        />
-
         {showInterior ? (
           <g>
             <rect
@@ -323,76 +247,7 @@ export function WardrobeScene({
               );
             })}
           </g>
-        ) : (
-          Array.from({ length: doors }).map((_, index) => {
-            const doorX = interiorX + index * (doorWidth + doorGap);
-            return (
-              <g key={index}>
-                <rect
-                  x={doorX}
-                  y={interiorTop}
-                  width={doorWidth}
-                  height={interiorBottom - interiorTop}
-                  rx={0.3}
-                  fill={isGlass ? `url(#${uid}-glass)` : `url(#${uid}-facade)`}
-                  stroke={shade(facadeColor, -30)}
-                  strokeWidth={0.3}
-                  opacity={isGlass ? 0.84 : 1}
-                />
-                <rect
-                  x={doorX + 0.4}
-                  y={interiorTop + 0.4}
-                  width={doorWidth - 0.8}
-                  height={1.1}
-                  fill="rgba(255,255,255,0.24)"
-                />
-                {config.facadeStyle === "shaker" && (
-                  <rect
-                    x={doorX + 4}
-                    y={interiorTop + 4}
-                    width={doorWidth - 8}
-                    height={interiorBottom - interiorTop - 8}
-                    fill="none"
-                    stroke={shade(facadeColor, -18)}
-                    strokeWidth={0.45}
-                    opacity={0.8}
-                  />
-                )}
-                {isGlass && (
-                  <path
-                    d={`M ${doorX + 2} ${interiorBottom - 18} L ${doorX + doorWidth - 5} ${interiorTop + 10}`}
-                    stroke="rgba(255,255,255,0.28)"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                  />
-                )}
-                <HandleMark
-                  x={
-                    doors === 2
-                      ? index === 0
-                        ? doorX + doorWidth - 1.5
-                        : doorX + 1.5
-                      : doorX + doorWidth - 2
-                  }
-                  y={interiorTop + (interiorBottom - interiorTop) * 0.18}
-                  height={(interiorBottom - interiorTop) * 0.64}
-                  kind={config.handle}
-                  side={doors === 2 ? (index === 0 ? "right" : "left") : "right"}
-                />
-              </g>
-            );
-          })
-        )}
-
-        {config.plinth && (
-          <rect
-            x={x + 0.7}
-            y={floorY - plinth}
-            width={sectionWidth - 1.4}
-            height={plinth}
-            fill={shade(bodyColor, -58)}
-          />
-        )}
+        ) : null}
       </g>
     );
   };
@@ -457,9 +312,121 @@ export function WardrobeScene({
         opacity={0.28}
       />
 
+      <rect
+        x={MARGIN}
+        y={TOP}
+        width={width}
+        height={height}
+        fill={`url(#${uid}-body)`}
+        stroke={shade(bodyColor, -34)}
+        strokeWidth={0.4}
+      />
+      <rect
+        x={MARGIN}
+        y={TOP}
+        width={geometry.bodyThicknessMm / 10}
+        height={height}
+        fill={shade(bodyColor, -20)}
+      />
+      <rect
+        x={MARGIN + width - geometry.bodyThicknessMm / 10}
+        y={TOP}
+        width={geometry.bodyThicknessMm / 10}
+        height={height}
+        fill={shade(bodyColor, -20)}
+      />
+      <rect
+        x={MARGIN}
+        y={TOP}
+        width={width}
+        height={geometry.bodyThicknessMm / 10}
+        fill={shade(bodyColor, -16)}
+      />
+      <rect
+        x={MARGIN + geometry.bodyThicknessMm / 10}
+        y={floorY - geometry.plinthHeightMm / 10 - geometry.bodyThicknessMm / 10}
+        width={geometry.internalWidthMm / 10}
+        height={geometry.bodyThicknessMm / 10}
+        fill={shade(bodyColor, -16)}
+      />
+      {geometry.partition && (
+        <rect
+          x={
+            MARGIN +
+            (geometry.partition.positionMm - geometry.partition.thicknessMm / 2) /
+              10
+          }
+          y={TOP}
+          width={geometry.partition.thicknessMm / 10}
+          height={height}
+          fill={shade(bodyColor, -42)}
+          stroke={shade(bodyColor, -55)}
+          strokeWidth={0.2}
+        />
+      )}
+      {geometry.plinthHeightMm > 0 && (
+        <rect
+          x={MARGIN + geometry.plinthInsetMm / 10}
+          y={floorY - geometry.plinthHeightMm / 10}
+          width={width - (2 * geometry.plinthInsetMm) / 10}
+          height={geometry.plinthHeightMm / 10}
+          fill={shade(bodyColor, -58)}
+        />
+      )}
+      {geometry.antresol && (
+        <rect
+          x={MARGIN + geometry.bodyThicknessMm / 10}
+          y={
+            TOP +
+            height -
+            geometry.antresol.dividerBottomMm / 10 -
+            geometry.antresol.dividerThicknessMm / 10
+          }
+          width={geometry.internalWidthMm / 10}
+          height={geometry.antresol.dividerThicknessMm / 10}
+          fill={shade(bodyColor, -38)}
+          stroke={shade(bodyColor, -52)}
+          strokeWidth={0.2}
+        />
+      )}
       <g filter={`url(#${uid}-shadow)`}>
-        {layout.map(({ section, x }) => renderSection(section, x))}
+        {layout.map(({ section, x, widthCm }) => renderSection(section, x, widthCm))}
       </g>
+
+      {!showInterior &&
+        facadeGeometry.panels.map((panel) => (
+          <g key={panel.id}>
+            <rect
+              x={MARGIN + panel.xMm / 10}
+              y={TOP + panel.yMm / 10}
+              width={panel.widthMm / 10}
+              height={panel.heightMm / 10}
+              rx={0.3}
+              fill={`url(#${uid}-facade)`}
+              stroke={shade(facadeColor, -30)}
+              strokeWidth={0.3}
+            />
+            <rect
+              x={MARGIN + panel.xMm / 10 + 0.4}
+              y={TOP + panel.yMm / 10 + 0.4}
+              width={Math.max(0, panel.widthMm / 10 - 0.8)}
+              height={1.1}
+              fill="rgba(255,255,255,0.24)"
+            />
+            {config.facadeStyle === "shaker" && (
+              <rect
+                x={MARGIN + panel.xMm / 10 + 4}
+                y={TOP + panel.yMm / 10 + 4}
+                width={Math.max(0, panel.widthMm / 10 - 8)}
+                height={Math.max(0, panel.heightMm / 10 - 8)}
+                fill="none"
+                stroke={shade(facadeColor, -18)}
+                strokeWidth={0.45}
+                opacity={0.8}
+              />
+            )}
+          </g>
+        ))}
 
       {selectedBox && <SelectionOutline {...selectedBox} />}
 
@@ -524,7 +491,7 @@ export function WardrobeScene({
               fill="#8a7c6c"
               fontSize={3.8}
             >
-              глубина {Math.round(config.depth)} см
+              полная глубина {Math.round(config.fullDepth / 10)} см
             </text>
           )}
         </g>

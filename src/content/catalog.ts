@@ -7,6 +7,7 @@ import type {
   HandleType,
   KitchenModuleType,
 } from "@/lib/configurator/types";
+import { WARDROBE_PLINTH_HEIGHT_CM } from "@/lib/configurator/facade-geometry";
 
 export interface Finish {
   id: string;
@@ -33,12 +34,28 @@ export interface CountertopOption extends MaterialOption<CountertopId> {
   defaultThickness: number;
 }
 
+/**
+ * Фасадный материал. Утверждённые толщины заданы только для ЛДСП и МДФ
+ * (CA-T-513); для остальных материалов толщина пока не утверждена.
+ */
+export interface FacadeMaterialOption extends MaterialOption<FacadeMaterialId> {
+  thicknesses?: number[];
+  defaultThickness?: number;
+}
+
+/** Техническая толщина для материалов без утверждённого списка (до решения владельца). */
+export const DEFAULT_FACADE_THICKNESS_MM = 19;
+
+/**
+ * Корпус фиксирован: ЛДСП 16 мм (CA-T-514). Пользователь материал не
+ * выбирает; сюда попадает только действующий материал.
+ */
 export const BODY_MATERIALS: MaterialOption<BodyMaterialId>[] = [
   {
     id: "ldsp",
     name: "ЛДСП",
     shortName: "ЛДСП",
-    description: "Практичный корпус с большим выбором декоров. Оптимальный баланс цены и долговечности.",
+    description: "Корпус ЛДСП 16 мм. Материал зафиксирован производственной моделью.",
     ratePerSqm: 5200,
     finishes: [
       { id: "milk", name: "Молочный", hex: "#EAE4D9" },
@@ -47,40 +64,30 @@ export const BODY_MATERIALS: MaterialOption<BodyMaterialId>[] = [
       { id: "graphite", name: "Графит", hex: "#3B3B39" },
     ],
   },
-  {
-    id: "mdf",
-    name: "МДФ",
-    shortName: "МДФ",
-    description: "Плотная основа для фрезеровки и эмали. Хорошо держит сложные формы и матовые покрытия.",
-    ratePerSqm: 7600,
-    finishes: [
-      { id: "sand", name: "Песочный", hex: "#D8C7B0" },
-      { id: "olive", name: "Олива", hex: "#6E745C" },
-      { id: "clay", name: "Терракота", hex: "#A87358" },
-      { id: "graphite", name: "Графит", hex: "#3B3B39" },
-    ],
-  },
-  {
-    id: "plywood",
-    name: "Фанера",
-    shortName: "Фанера",
-    description: "Натуральный срез и выразительная текстура. Подходит для тёплых, тактильных интерьеров.",
-    ratePerSqm: 9200,
-    finishes: [
-      { id: "birch", name: "Берёза", hex: "#DCC9A8" },
-      { id: "oak", name: "Дуб", hex: "#B99163" },
-      { id: "ash", name: "Ясень", hex: "#C8AE89" },
-    ],
-  },
 ];
 
-export const FACADE_MATERIALS: MaterialOption<FacadeMaterialId>[] = [
+/**
+ * CA-516-01: единый источник палитры МДФ. МДФ эмаль и МДФ ПВХ используют
+ * один и тот же массив — палитры не могут разойтись при обновлении.
+ * Материалы и тарифы при этом остаются отдельными записями.
+ */
+export const MDF_FACADE_FINISHES: Finish[] = [
+  { id: "milk", name: "Тёплый белый", hex: "#F0EBE2" },
+  { id: "sand", name: "Песок", hex: "#D4C2A8" },
+  { id: "olive", name: "Олива", hex: "#72775F" },
+  { id: "clay", name: "Терракота", hex: "#A67559" },
+  { id: "graphite", name: "Графит", hex: "#343431" },
+];
+
+export const FACADE_MATERIALS: FacadeMaterialOption[] = [
   {
     id: "ldsp",
     name: "ЛДСП",
     shortName: "ЛДСП",
     description: "Ровные матовые фасады в спокойной палитре. Разумное решение для больших гарнитуров.",
     ratePerSqm: 5600,
+    thicknesses: [16, 18],
+    defaultThickness: 16,
     finishes: [
       { id: "milk", name: "Молочный", hex: "#EFEAE1" },
       { id: "sand", name: "Песочный", hex: "#D6C5AC" },
@@ -91,23 +98,35 @@ export const FACADE_MATERIALS: MaterialOption<FacadeMaterialId>[] = [
   {
     id: "mdf",
     name: "МДФ в эмали",
-    shortName: "МДФ",
+    shortName: "МДФ эмаль",
     description: "Матовые или сатиновые фасады с точным цветом. База для интегрированных ручек и фрезеровки.",
     ratePerSqm: 8400,
-    finishes: [
-      { id: "milk", name: "Тёплый белый", hex: "#F0EBE2" },
-      { id: "sand", name: "Песок", hex: "#D4C2A8" },
-      { id: "olive", name: "Олива", hex: "#72775F" },
-      { id: "clay", name: "Терракота", hex: "#A67559" },
-      { id: "graphite", name: "Графит", hex: "#343431" },
-    ],
+    thicknesses: [16, 19, 22],
+    defaultThickness: 19,
+    finishes: MDF_FACADE_FINISHES,
   },
   {
+    id: "mdf_pvc",
+    name: "МДФ в плёнке ПВХ",
+    shortName: "МДФ ПВХ",
+    description: "Фасады в плёнке ПВХ: практичная поверхность и широкая палитра декоров.",
+    ratePerSqm: 8400,
+    thicknesses: [16, 19, 22],
+    defaultThickness: 19,
+    finishes: MDF_FACADE_FINISHES,
+  },
+];
+
+/**
+ * Исторические материалы: нужны только для чтения/отображения старых
+ * проектов. В UI, bootstrap и новые PriceItem не попадают.
+ */
+export const LEGACY_FACADE_MATERIALS: FacadeMaterialOption[] = [
+  {
     id: "veneer",
-    name: "Шпон",
+    name: "Шпон (архив)",
     shortName: "Шпон",
-    description: "Живой рисунок дерева и натуральная глубина цвета. Каждый фасад имеет собственный рисунок.",
-    ratePerSqm: 11800,
+    description: "Исторический материал; для новых конфигураций недоступен.",
     finishes: [
       { id: "oak", name: "Дуб натуральный", hex: "#C5A274" },
       { id: "walnut", name: "Орех", hex: "#70513A" },
@@ -116,10 +135,9 @@ export const FACADE_MATERIALS: MaterialOption<FacadeMaterialId>[] = [
   },
   {
     id: "glass",
-    name: "Стекло",
+    name: "Стекло (архив)",
     shortName: "Стекло",
-    description: "Визуально лёгкие секции с алюминиевым профилем. Уместно для верхнего ряда и витрин.",
-    ratePerSqm: 14400,
+    description: "Исторический материал; для новых конфигураций недоступен.",
     finishes: [
       { id: "clear", name: "Прозрачное", hex: "#B9C6C4" },
       { id: "smoke", name: "Дымчатое", hex: "#686E6D" },
@@ -128,10 +146,9 @@ export const FACADE_MATERIALS: MaterialOption<FacadeMaterialId>[] = [
   },
   {
     id: "solid",
-    name: "Массив",
+    name: "Массив (архив)",
     shortName: "Массив",
-    description: "Тёплый натуральный материал для акцентных элементов. Требует стабильного микроклимата.",
-    ratePerSqm: 18600,
+    description: "Исторический материал; для новых конфигураций недоступен.",
     finishes: [
       { id: "oak", name: "Дуб", hex: "#BB925F" },
       { id: "walnut", name: "Орех", hex: "#6B4A33" },
@@ -246,6 +263,44 @@ export function snapCountertopThickness(
   );
 }
 
+/** Найти фасадный материал: сначала действующий, затем исторический. */
+export function findFacadeMaterial(
+  id: string,
+): FacadeMaterialOption | undefined {
+  return (
+    FACADE_MATERIALS.find((item) => item.id === id) ??
+    LEGACY_FACADE_MATERIALS.find((item) => item.id === id)
+  );
+}
+
+/** Утверждённые толщины фасада для материала; пусто — список не утверждён. */
+export function facadeThicknesses(material: string): number[] {
+  return findFacadeMaterial(material)?.thicknesses ?? [];
+}
+
+/** Толщина по умолчанию для материала (или техническая, пока не утверждена). */
+export function defaultFacadeThickness(material: string): number {
+  return findFacadeMaterial(material)?.defaultThickness ?? DEFAULT_FACADE_THICKNESS_MM;
+}
+
+/**
+ * Подобрать ближайшую допустимую толщину фасада. Для материалов без
+ * утверждённого списка сохраняется фактическое значение (или техническое).
+ */
+export function snapFacadeThickness(
+  material: string,
+  thickness: number,
+): number {
+  const options = facadeThicknesses(material);
+  if (options.length === 0) {
+    return Number.isFinite(thickness) ? thickness : DEFAULT_FACADE_THICKNESS_MM;
+  }
+  if (!Number.isFinite(thickness)) return defaultFacadeThickness(material);
+  return options.reduce((best, value) =>
+    Math.abs(value - thickness) < Math.abs(best - thickness) ? value : best,
+  );
+}
+
 export const HANDLES: {
   id: HandleType;
   name: string;
@@ -307,12 +362,12 @@ export const KITCHEN_MODULES: Record<
     minWidth: 40,
     maxWidth: 120,
     defaultWidth: 60,
-    minHeight: 80,
-    maxHeight: 95,
-    defaultHeight: 90,
-    minDepth: 50,
-    maxDepth: 60,
-    defaultDepth: 60,
+    minHeight: 70,
+    maxHeight: 85,
+    defaultHeight: 85,
+    minDepth: 40,
+    maxDepth: 58,
+    defaultDepth: 55.8,
     defaultShelves: 1,
     defaultDrawers: 0,
     basePrice: 8200,
@@ -326,12 +381,12 @@ export const KITCHEN_MODULES: Record<
     minWidth: 40,
     maxWidth: 120,
     defaultWidth: 60,
-    minHeight: 80,
-    maxHeight: 95,
-    defaultHeight: 90,
-    minDepth: 55,
-    maxDepth: 60,
-    defaultDepth: 60,
+    minHeight: 70,
+    maxHeight: 85,
+    defaultHeight: 85,
+    minDepth: 40,
+    maxDepth: 58,
+    defaultDepth: 55.8,
     defaultShelves: 0,
     defaultDrawers: 0,
     basePrice: 11400,
@@ -344,12 +399,12 @@ export const KITCHEN_MODULES: Record<
     minWidth: 50,
     maxWidth: 100,
     defaultWidth: 60,
-    minHeight: 80,
-    maxHeight: 95,
-    defaultHeight: 90,
-    minDepth: 55,
-    maxDepth: 60,
-    defaultDepth: 60,
+    minHeight: 70,
+    maxHeight: 85,
+    defaultHeight: 85,
+    minDepth: 40,
+    maxDepth: 58,
+    defaultDepth: 55.8,
     defaultShelves: 1,
     defaultDrawers: 0,
     basePrice: 10400,
@@ -362,12 +417,12 @@ export const KITCHEN_MODULES: Record<
     minWidth: 40,
     maxWidth: 100,
     defaultWidth: 60,
-    minHeight: 80,
-    maxHeight: 95,
-    defaultHeight: 90,
-    minDepth: 50,
-    maxDepth: 60,
-    defaultDepth: 60,
+    minHeight: 70,
+    maxHeight: 85,
+    defaultHeight: 85,
+    minDepth: 40,
+    maxDepth: 58,
+    defaultDepth: 55.8,
     defaultShelves: 0,
     defaultDrawers: 3,
     basePrice: 12100,
@@ -435,12 +490,12 @@ export const KITCHEN_MODULES: Record<
     minWidth: 15,
     maxWidth: 30,
     defaultWidth: 20,
-    minHeight: 80,
-    maxHeight: 95,
-    defaultHeight: 90,
-    minDepth: 50,
-    maxDepth: 60,
-    defaultDepth: 60,
+    minHeight: 70,
+    maxHeight: 85,
+    defaultHeight: 85,
+    minDepth: 40,
+    maxDepth: 58,
+    defaultDepth: 55.8,
     defaultShelves: 0,
     defaultDrawers: 0,
     basePrice: 5000,
@@ -485,6 +540,7 @@ export const KITCHEN_LIMITS = {
   maxDrawers: 4,
   minCountertopMeters: 0.8,
   maxWallOverhang: 20,
+  // 100–150 mm; values are in cm because config dimensions use cm.
   minPlinthHeight: 10,
   maxPlinthHeight: 15,
   defaultPlinthHeight: 10,
@@ -504,9 +560,9 @@ export const WARDROBE_LIMITS = {
   maxDepth: 70,
   maxShelvesPerSection: 10,
   maxRodsPerSection: 2,
-  maxDrawersPerSection: 4,
+  maxDrawersPerSection: 5,
   minShelfGap: 12,
-  plinthHeight: 8,
+  plinthHeight: WARDROBE_PLINTH_HEIGHT_CM,
   carcassThickness: 2,
   drawerHeight: 20,
 } as const;

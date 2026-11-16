@@ -11,6 +11,13 @@ import {
 import { ledColorHex } from "@/content/lighting";
 import { shade, withAlpha } from "@/lib/color";
 import { sinkGeometry, sinkLayout, sinkRowContext } from "@/lib/configurator/sink";
+import { kitchenLowerTotalHeightCm } from "@/lib/configurator/geometry";
+import {
+  FACADE_DRAWER_GAP_CM,
+  facadeStack,
+  kitchenFacadeField,
+} from "@/lib/configurator/facade-geometry";
+import { FIXED_BODY_MATERIAL_ID } from "@/lib/configurator/materials";
 import { computeSupports } from "@/lib/configurator/supports";
 import { SelectionOutline } from "@/components/configurator/SelectionOutline";
 import type { KitchenConfig, KitchenModule } from "@/lib/configurator/types";
@@ -44,10 +51,6 @@ function finishFor(
 ): string {
   const option = materials.find((item) => item.id === material);
   return option?.finishes.find((item) => item.id === finish)?.hex ?? option?.finishes[0]?.hex ?? fallback;
-}
-
-function doorCount(width: number): number {
-  return width > 60 ? 2 : 1;
 }
 
 function HandleMark({
@@ -164,7 +167,7 @@ export function KitchenScene({
     floorModules.find(
       (module) => !["tall", "oven"].includes(module.type),
     )?.height ?? floorModules[0]?.height,
-    90,
+    KITCHEN_MODULES.base.defaultHeight,
   );
   const tallestFloor = floorModules.reduce(
     (max, module) => Math.max(max, safe(module.height, baseHeight)),
@@ -179,10 +182,14 @@ export function KitchenScene({
   const plinthCm = config.plinth ? safe(config.plinthHeight, 10) : 0;
   const contentTop = Math.max(
     tallestFloor,
-    baseHeight + countertopCm + KITCHEN_LIMITS.wallGapAboveCountertop + tallestUpper,
+    plinthCm +
+      baseHeight +
+      countertopCm +
+      KITCHEN_LIMITS.wallGapAboveCountertop +
+      tallestUpper,
   );
   const floorY = Math.max(MIN_FLOOR_Y, contentTop + 10);
-  const counterTopY = floorY - baseHeight - countertopCm;
+  const counterTopY = floorY - kitchenLowerTotalHeightCm(config);
   const wallBottomY = counterTopY - KITCHEN_LIMITS.wallGapAboveCountertop;
   // Общая высота кухни от пола до верхней точки (пенал или верхний ряд).
   const totalHeight = contentTop;
@@ -200,18 +207,13 @@ export function KitchenScene({
   );
   const bodyColor = finishFor(
     BODY_MATERIALS,
-    config.bodyMaterial,
+    FIXED_BODY_MATERIAL_ID,
     config.bodyFinish,
     "#d8c3a5",
   );
   const counterMaterial = COUNTERTOPS.find((item) => item.id === config.countertop);
   const counterColor = counterMaterial?.finishes[0]?.hex ?? "#e5e1d9";
   const counterAccent = counterMaterial?.finishes[0]?.accent ?? "#aaa398";
-  // Монтажные зазоры фасадов (см): 2 мм у края ряда, 1 мм к соседу,
-  // 1 мм между створками модуля; между ящиками 2 мм (урезка 1 мм на створку).
-  const EDGE_GAP = 0.2;
-  const NEIGHBOR_GAP = 0.1;
-  const DOOR_GAP = 0.1;
   const invalidSet = new Set(invalidIds ?? []);
 
   const floorLayout = floorModules.reduce<{ module: KitchenModule; x: number }[]>(
@@ -278,23 +280,30 @@ export function KitchenScene({
   ) => {
     const width = safe(module.width, 60);
     const height = safe(module.height, baseHeight);
-    const top = floorY - height;
     const isTall = module.type === "tall" || module.type === "oven";
-    const bodyBottom = floorY - (config.plinth && isTall ? plinthCm : 0);
-    const gapLeft = rowStart ? EDGE_GAP : NEIGHBOR_GAP;
-    const gapRight = rowEnd ? EDGE_GAP : NEIGHBOR_GAP;
-    const doorTop = top + EDGE_GAP;
-    const doorBottom = bodyBottom - EDGE_GAP;
-    const doors = doorCount(width);
-    const innerWidth = width - gapLeft - gapRight;
-    const doorWidth = (innerWidth - DOOR_GAP * (doors - 1)) / doors;
+    const bodyBottom = floorY - plinthCm;
+    const top = isTall ? floorY - height : bodyBottom - height;
+    const bodyHeight = isTall ? height - plinthCm : height;
+    const facade = kitchenFacadeField({
+      widthCm: width,
+      heightCm: height,
+      type: module.type,
+      rowStart,
+      rowEnd,
+      plinthHeightCm: plinthCm,
+    });
+    const doorTop = top + (facade.panels[0]?.yCm ?? 0);
+    const doorBottom = doorTop + facade.fieldHeightCm;
     // Конструкция модуля под мойку: фасады, перегородки и секции считаются
     // по единому правилу (см. lib/configurator/sink.ts), а не простым делением.
     const sink =
       module.type === "sink"
         ? sinkLayout(
             { ...module, width },
-            { left: gapLeft, right: gapRight },
+            {
+              left: facade.leftGapCm,
+              right: facade.rightGapCm,
+            },
             sinkRowContext(floorModules, module.id),
           )
         : null;
@@ -560,34 +569,35 @@ export function KitchenScene({
           {sink.facadeBoxes.map((box, index) => {
             // Фронты ящиков — стопкой, каждый со своей ручкой (2 мм между).
             if (box.kind === "drawers") {
-              const count = Math.max(1, box.fronts ?? 1);
-              const available = doorBottom - doorTop;
-              const drawerHeight = available / count;
               return (
                 <g key={index}>
-                  {Array.from({ length: count }).map((__, front) => {
-                    const y = doorTop + front * drawerHeight;
-                    const trimTop = front > 0 ? 0.1 : 0;
-                    const trimBottom = front < count - 1 ? 0.1 : 0;
-                    const frontY = y + trimTop;
-                    const frontH = Math.max(0.2, drawerHeight - trimTop - trimBottom);
+                  {facadeStack({
+                    widthCm: box.width,
+                    heightCm: doorBottom - doorTop,
+                    topGapCm: 0,
+                    bottomGapCm: 0,
+                    gapCm: FACADE_DRAWER_GAP_CM,
+                    count: box.fronts ?? 1,
+                  }).panels.map((panel, front) => {
+                    const frontX = x + box.x + panel.xCm;
+                    const frontY = doorTop + panel.yCm;
                     return (
                       <g key={front}>
                         <rect
-                          x={x + box.x}
+                          x={frontX}
                           y={frontY}
-                          width={box.width}
-                          height={frontH}
+                          width={panel.widthCm}
+                          height={panel.heightCm}
                           rx={0.25}
                           fill={`url(#${uid}-facade)`}
                           stroke={shade(facadeColor, -28)}
                           strokeWidth={0.28}
                         />
                         <HandleMark
-                          x={x + box.x}
+                          x={frontX}
                           y={frontY}
-                          width={box.width}
-                          height={frontH}
+                          width={panel.widthCm}
+                          height={panel.heightCm}
                           kind={config.handle}
                           horizontal
                         />
@@ -640,7 +650,7 @@ export function KitchenScene({
           x={x}
           y={top}
           width={width}
-          height={height - (config.plinth && isTall ? plinthCm : 0)}
+          height={bodyHeight}
           rx={0.6}
           fill={`url(#${uid}-facade)`}
           stroke={shade(facadeColor, -28)}
@@ -713,34 +723,33 @@ export function KitchenScene({
           </>
         ) : module.type === "drawers" ? (
           <>
-            {Array.from({ length: Math.max(1, module.drawers) }).map((_, index) => {
-              const count = Math.max(1, module.drawers);
-              const available = doorBottom - doorTop;
-              const drawerHeight = available / count;
-              const y = doorTop + index * drawerHeight;
-              // Между ящиками 2 мм: каждый фасад урезан на 1 мм сверху/снизу,
-              // внешние края остаются с зазором 2 мм (doorTop/doorBottom).
-              const trimTop = index > 0 ? 0.1 : 0;
-              const trimBottom = index < count - 1 ? 0.1 : 0;
-              const frontY = y + trimTop;
-              const frontH = Math.max(0.2, drawerHeight - trimTop - trimBottom);
+            {facadeStack({
+              widthCm: facade.fieldWidthCm,
+              heightCm: facade.fieldHeightCm,
+              topGapCm: 0,
+              bottomGapCm: 0,
+              gapCm: FACADE_DRAWER_GAP_CM,
+              count: module.drawers,
+            }).panels.map((panel, index) => {
+              const frontX = x + facade.leftGapCm + panel.xCm;
+              const frontY = doorTop + panel.yCm;
               return (
                 <g key={index}>
                   <rect
-                    x={x + gapLeft}
+                    x={frontX}
                     y={frontY}
-                    width={width - gapLeft - gapRight}
-                    height={frontH}
+                    width={panel.widthCm}
+                    height={panel.heightCm}
                     rx={0.25}
                     fill={`url(#${uid}-facade)`}
                     stroke={shade(facadeColor, -28)}
                     strokeWidth={0.28}
                   />
                   <HandleMark
-                    x={x + gapLeft}
+                    x={frontX}
                     y={frontY}
-                    width={width - gapLeft - gapRight}
-                    height={frontH}
+                    width={panel.widthCm}
+                    height={panel.heightCm}
                     kind={config.handle}
                     horizontal
                   />
@@ -752,15 +761,15 @@ export function KitchenScene({
           renderSinkDoors()
         ) : (
           <>
-            {Array.from({ length: doors }).map((_, index) => {
-              const doorX = x + gapLeft + index * (doorWidth + DOOR_GAP);
+            {facade.panels.map((panel, index) => {
+              const doorX = x + panel.xCm;
               return (
                 <g key={index}>
                   <rect
                     x={doorX}
-                    y={doorTop}
-                    width={doorWidth}
-                    height={doorBottom - doorTop}
+                    y={top + panel.yCm}
+                    width={panel.widthCm}
+                    height={panel.heightCm}
                     rx={0.3}
                     fill={`url(#${uid}-facade)`}
                     stroke={shade(facadeColor, -30)}
@@ -769,15 +778,15 @@ export function KitchenScene({
                   <rect
                     x={doorX + 0.35}
                     y={doorTop + 0.35}
-                    width={doorWidth - 0.7}
+                    width={panel.widthCm - 0.7}
                     height={0.9}
                     fill="rgba(255,255,255,0.22)"
                   />
                   <HandleMark
                     x={doorX}
                     y={doorTop + (module.type === "tall" ? 14 : 2)}
-                    width={doorWidth}
-                    height={doorBottom - doorTop - (module.type === "tall" ? 16 : 4)}
+                    width={panel.widthCm}
+                    height={panel.heightCm - (module.type === "tall" ? 16 : 4)}
                     kind={config.handle}
                   />
                 </g>
@@ -854,11 +863,14 @@ export function KitchenScene({
     const width = safe(module.width, 60);
     const height = safe(module.height, 72);
     const top = wallBottomY - height;
-    const doors = doorCount(width);
-    const gapLeft = rowStart ? EDGE_GAP : NEIGHBOR_GAP;
-    const gapRight = rowEnd ? EDGE_GAP : NEIGHBOR_GAP;
-    const innerWidth = width - gapLeft - gapRight;
-    const doorWidth = (innerWidth - DOOR_GAP * (doors - 1)) / doors;
+    const facade = kitchenFacadeField({
+      widthCm: width,
+      heightCm: height,
+      type: module.type,
+      rowStart,
+      rowEnd,
+      plinthHeightCm: 0,
+    });
 
     return (
       <g key={module.id} {...interactiveProps(module)}>
@@ -905,15 +917,15 @@ export function KitchenScene({
             })}
           </>
         ) : (
-          Array.from({ length: doors }).map((_, index) => {
-            const doorX = x + gapLeft + index * (doorWidth + DOOR_GAP);
+          facade.panels.map((panel, index) => {
+            const doorX = x + panel.xCm;
             return (
               <g key={index}>
                 <rect
                   x={doorX}
-                  y={top + EDGE_GAP}
-                  width={doorWidth}
-                  height={height - EDGE_GAP * 2}
+                  y={top + panel.yCm}
+                  width={panel.widthCm}
+                  height={panel.heightCm}
                   rx={0.3}
                   fill={`url(#${uid}-facade)`}
                   stroke={shade(facadeColor, -30)}
@@ -921,16 +933,16 @@ export function KitchenScene({
                 />
                 <rect
                   x={doorX + 0.35}
-                  y={top + EDGE_GAP + 0.35}
-                  width={doorWidth - 0.7}
+                  y={top + panel.yCm + 0.35}
+                  width={panel.widthCm - 0.7}
                   height={0.8}
                   fill="rgba(255,255,255,0.22)"
                 />
                 <HandleMark
                   x={doorX}
                   y={top + 2}
-                  width={doorWidth}
-                  height={height - 4}
+                  width={panel.widthCm}
+                  height={panel.heightCm}
                   kind={config.handle}
                 />
               </g>
@@ -980,7 +992,14 @@ export function KitchenScene({
     if (floorEntry) {
       const width = safe(floorEntry.module.width, 60);
       const height = safe(floorEntry.module.height, baseHeight);
-      return { x: floorEntry.x, y: floorY - height, width, height };
+      const tall =
+        floorEntry.module.type === "tall" || floorEntry.module.type === "oven";
+      return {
+        x: floorEntry.x,
+        y: tall ? floorY - height : floorY - plinthCm - height,
+        width,
+        height: tall ? height - plinthCm : height,
+      };
     }
     const upperEntry = upperLayout.find(({ module }) => module.id === selectedId);
     if (upperEntry) {
@@ -1413,9 +1432,9 @@ export function KitchenScene({
           />
           <text
             x={MARGIN - 19}
-            y={(floorY + (floorY - baseHeight)) / 2}
+            y={(floorY + (floorY - (plinthCm + baseHeight))) / 2}
             textAnchor="middle"
-            transform={`rotate(-90 ${MARGIN - 19} ${(floorY + (floorY - baseHeight)) / 2})`}
+            transform={`rotate(-90 ${MARGIN - 19} ${(floorY + (floorY - (plinthCm + baseHeight))) / 2})`}
             fontSize={compact ? 5.6 : 6.4}
             fontWeight={700}
             fill="#6f6356"

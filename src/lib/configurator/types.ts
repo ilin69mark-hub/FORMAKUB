@@ -14,7 +14,18 @@ export type FacadeStyle = "flat" | "shaker" | "handleless";
 export type HandleType = "bar" | "knob" | "profile" | "none";
 export type HingeType = "standard" | "soft";
 export type BodyMaterialId = "ldsp" | "mdf" | "plywood";
-export type FacadeMaterialId = "ldsp" | "mdf" | "veneer" | "glass" | "solid";
+/**
+ * Действующие материалы фасадов + исторические id для чтения старых
+ * проектов. Исторические значения не предлагаются в UI и не создают
+ * новых CatalogItem/PriceItem.
+ */
+export type FacadeMaterialId =
+  | "ldsp"
+  | "mdf"
+  | "mdf_pvc"
+  | "veneer"
+  | "glass"
+  | "solid";
 
 /** Материал цоколя. */
 export type PlinthMaterialId =
@@ -146,6 +157,8 @@ export interface KitchenConfig {
   facadeMaterial: FacadeMaterialId;
   facadeFinish: string;
   facadeStyle: FacadeStyle;
+  /** Фактическая толщина выбранного фасада, мм (CA-T-513). */
+  facadeThickness: number;
   countertop: CountertopId;
   /** Толщина столешницы в миллиметрах. */
   countertopThickness: number;
@@ -174,21 +187,99 @@ export interface KitchenConfig {
 
 export interface WardrobeSection {
   id: string;
-  width: number;
   shelves: number[];
   rods: number[];
   drawers: number;
+  /** Блок ящиков (этап 1: исходные параметры, без геометрии). */
+  drawerBlock?: WardrobeDrawerBlock;
+  /** Тип штанги секции; по умолчанию standard. */
+  rodType?: WardrobeRodType;
+  /** Параметры выдвижной штанги (только при rodType = pullout). */
+  pulloutRod?: WardrobePulloutRod;
+  /** Ссылка на модель опоры обычной штанги. */
+  rodSupportModelId?: string;
+}
+
+export type WardrobeFacadeMaterial = "ldsp" | "mdf_pvc";
+export type WardrobeFacadeMount = "overlay";
+export type WardrobeRodType = "standard" | "pullout";
+export type WardrobePulloutExecution = "wire" | "ball";
+export type WardrobeRunnerLoadClass = "standard" | "heavy";
+export type WardrobeDrawerFrontType = "overlay" | "inset";
+
+/** Параметры корпуса ящика — только исходные данные, без расчёта. */
+export interface WardrobeDrawerBoxParams {
+  sideThicknessMm: 16;
+  frontThicknessMm: 16;
+  backThicknessMm: 16;
+  bottomThicknessMm: 3;
+  bottomMount: "overlay-bottom";
+}
+
+/** Направляющие блока ящиков. */
+export interface WardrobeDrawerRunner {
+  type: "ball-bearing-side";
+  lengthMm: 250 | 300 | 350 | 400 | 450 | 500 | 550;
+  softClose: boolean;
+  loadClass: WardrobeRunnerLoadClass;
+  modelId?: string;
+}
+
+/** Исходные параметры блока ящиков. */
+export interface WardrobeDrawerBlock {
+  topMm: number;
+  frontHeightsMm: number[];
+  frontType: WardrobeDrawerFrontType;
+  box: WardrobeDrawerBoxParams;
+  runner: WardrobeDrawerRunner;
+}
+
+/** Параметры выдвижной штанги. */
+export interface WardrobePulloutRod {
+  lengthMm: 250 | 300 | 350 | 400 | 450 | 500;
+  execution: WardrobePulloutExecution;
+  loadClass: "budget" | "reinforced";
+  modelId?: string;
+}
+
+/** Антресоль: отдельная высота и отдельное фасадное поле. */
+export interface WardrobeAntresol {
+  /** Высота антресоли; фасад использует общие параметры материала/толщины. */
+  heightMm: number;
+}
+
+/** Ссылки на модели фурнитуры; отсутствие ссылки допустимо. */
+export interface WardrobeHardwareRefs {
+  hingeModelId?: string;
+  shelfSupportModelId?: string;
+  standardRodSupportModelId?: string;
+  fastenerModelIds?: string[];
 }
 
 export interface WardrobeConfig {
   version: 1;
   kind: "wardrobe";
   height: number;
-  depth: number;
+  /** Общая внешняя ширина шкафа, мм. */
+  widthMm: number;
+  /** Полная внешняя глубина: фасад + корпус + ХДФ, мм. */
+  fullDepth: number;
   sections: WardrobeSection[];
-  bodyMaterial: BodyMaterialId;
+  bodyMaterial: "ldsp";
   bodyFinish: string;
-  facadeMaterial: FacadeMaterialId;
+  /** Толщина корпуса, мм. */
+  bodyThicknessMm: 16;
+  /** Толщина задней стенки ХДФ, мм. */
+  backPanelThicknessMm: 3;
+  plinthHeightMm: 80;
+  plinthInsetMm: 50;
+  /** Центральная перегородка; null — перегородки нет. */
+  partition: { positionMm: number } | null;
+  /** Антресоль; null — антресоли нет. */
+  antresol: WardrobeAntresol | null;
+  facadeMaterial: WardrobeFacadeMaterial;
+  facadeThickness: number;
+  facadeMount: WardrobeFacadeMount;
   facadeFinish: string;
   facadeStyle: FacadeStyle;
   handle: HandleType;
@@ -196,6 +287,7 @@ export interface WardrobeConfig {
   pushToOpen: boolean;
   plinth: boolean;
   ledLighting: boolean;
+  hardware?: WardrobeHardwareRefs;
   promoCode?: string;
 }
 
@@ -262,6 +354,8 @@ export interface LeadPayload {
   customer: LeadCustomer;
   source?: string;
   interest?: FurnitureInterest;
+  /** CA-GL-25: сохранённый проект, к которому относится заявка. */
+  projectId?: string;
 }
 
 export interface StoredLead extends LeadPayload {
@@ -269,6 +363,150 @@ export interface StoredLead extends LeadPayload {
   createdAt: string;
   status: "new";
   price: PriceBreakdown | null;
+}
+
+/**
+ * Зафиксированные версии Reference Data, использованные проектом
+ * (дизайн §6.2/§6.3/§7.7, CA-T-108).
+ *
+ * Разрешение ссылок при пересчёте идёт строго по этим версиям, а не по
+ * «живым» значениям справочников: правка `attrs`/границ пресета не должна
+ * менять старые проекты (A5). Отсутствие поля у легаси-проекта трактуется
+ * как `inferred` — версия выводится один раз и закрепляется при следующей
+ * записи.
+ */
+export interface ProjectPins {
+  /** `{ <catalog>: { <id>: <version> } }` — CatalogItem (§6.2). */
+  catalogVersions?: Record<string, Record<string, string>>;
+  /** `{ <family>: { <id>: <version> } }` — ModulePreset (§6.3). */
+  presetVersions?: Record<string, Record<string, string>>;
+}
+
+/** Результат оценки условия строки Composition (E1–E4). */
+export type CompositionTraceCondition =
+  | "true"
+  | "false"
+  | "not_evaluated"
+  | "error"
+  | "not_required";
+
+/** Статус строки компонентной трассировки. */
+export type CompositionTraceLineStatus =
+  | "resolved"
+  | "excluded"
+  | "quantity_unresolved"
+  | "price_unresolved"
+  | "blocked";
+
+/** Код диагностики трассировки (расширяемый набор строк). */
+export type CompositionTraceIssueCode =
+  | "TRACE_CONDITION_NOT_EXECUTABLE"
+  | "TRACE_QUANTITY_UNRESOLVED"
+  | "TRACE_QUANTITY_INVALID"
+  | "TRACE_PRICE_UNRESOLVED"
+  | "TRACE_PRICE_UNIT_UNKNOWN"
+  | "TRACE_UNIT_INCOMPATIBLE"
+  | "TRACE_ALTERNATIVE_AMBIGUOUS"
+  | "TRACE_ALTERNATIVE_INVALID"
+  | "TRACE_ENGINE_BREAKDOWN_INVALID"
+  /* Диагностика версий тарифа (только warning, расчёт не блокирует). */
+  | "PRICE_VERSION_PIN_MISSING"
+  | "PRICE_VERSION_DRIFT"
+  /* Drift-предупреждения preflight, переносимые в trace без потери кода. */
+  | "COMPOSITION_PRICE_VERSION_DRIFT"
+  | "COMPOSITION_PRICE_SNAPSHOT_DRIFT"
+  | "COMPOSITION_CATALOG_VERSION_DRIFT";
+
+/**
+ * Строка исторического CompositionTrace (E4).
+ *
+ * Поля — widened-типы (`relation`/`unit`/`status` — строки), чтобы снимок
+ * оставался самостоятельным контрактом хранения и не зависел от
+ * административной модели Composition.
+ */
+export interface CompositionTraceSnapshotLine {
+  lineId: string;
+  moduleType: string;
+  relation: string;
+  condition: CompositionTraceCondition;
+  quantity: number | null;
+  unit: string | null;
+  quantitySource: "fixed" | "unresolved";
+  priceItemId?: string;
+  amount: number | null;
+  priceItemUnit: string | null;
+  priceAmount: number | null;
+  status: CompositionTraceLineStatus;
+}
+
+export interface CompositionTraceSnapshotIssue {
+  severity: "error" | "warning";
+  code: CompositionTraceIssueCode;
+  message: string;
+  lineId?: string;
+  entityId?: string;
+}
+
+/**
+ * Самодостаточный исторический снимок компонентной трассировки (E4).
+ *
+ * Хранится внутри конкретного события `ProjectPriceHistory` вместе с
+ * `breakdown`: воспроизведение не требует текущих Composition/PricingVersion/
+ * PriceItem/RulesSnapshot. Поле — только для чтения, после записи не меняется.
+ */
+export interface CompositionTraceSnapshot {
+  traceVersion: 1;
+  /** Общий статус trace. `blocked` не блокирует расчёт Engine (E3/§6). */
+  status: "computed" | "blocked";
+  compositionVersionId: string;
+  compositionContentHash: string;
+  /** Снимок правил, закреплённый в Composition (null — не закреплён). */
+  compositionRulesSnapshotId: string | null;
+  /** Снимок правил, использованный в этом расчёте (null — legacy). */
+  rulesSnapshotId: string | null;
+  /** PricingVersion, использованная Engine. */
+  enginePriceVersionId: string;
+  /** Версия структуры ценового снимка. */
+  enginePriceBaseSchema: number;
+  /** PricingVersion, закреплённая в Composition (В-7; null — legacy). */
+  pinnedPriceVersionId: string | null;
+  catalogVersions?: Record<string, Record<string, string>>;
+  priceItemVersions?: Record<string, string>;
+  lines: CompositionTraceSnapshotLine[];
+  warnings: CompositionTraceSnapshotIssue[];
+  /** Время вычисления trace (ISO-8601), фиксируется вместе с расчётом. */
+  computedAt: string;
+}
+
+/**
+ * Неизменяемое событие успешно применённого расчёта (CA-T-306E).
+ * Хранится внутри StoredProject.priceHistory[]; append-only на уровне домена.
+ */
+export interface ProjectPriceHistory {
+  id: string;
+  projectId: string;
+  operationId: string;
+  reason: "create" | "manual_recalc";
+  fromPriceVersionId: string | null;
+  toPriceVersionId: string;
+  schemaVersion: number;
+  calcVersion: string;
+  oldPrice: number | null;
+  newPrice: number;
+  delta: number | null;
+  breakdown: PriceBreakdown;
+  breakdownVersion: number;
+  /** Снимок состава, использованный при пересчёте (optional для старых записей). */
+  compositionVersionId?: string;
+  /**
+   * E4: исторический снимок компонентной трассировки этого расчёта.
+   * Optional/additive: записи до E4 валидны без него и **не** мигрируются.
+   * При наличии — читается как есть, без пересчёта (см. Inspector).
+   */
+  compositionTrace?: CompositionTraceSnapshot;
+  requestFingerprint: string;
+  requestFingerprintVersion: string;
+  computedAt: string;
 }
 
 export interface StoredProject {
@@ -281,6 +519,24 @@ export interface StoredProject {
   schemaVersion?: number;
   /** Версия сборки движка, выполнившей расчёт (§5.1, CA-T-107). */
   calcVersion?: string;
+  /** Версия прайса, использованная при сохранении (ADR-06, CA-T-304A). */
+  priceVersion?: string;
+  /**
+   * Закреплённая опубликованная версия состава модулей (Composition Management).
+   * Optional: старые проекты читаются без неё; новый расчёт без версии
+   * состава не блокируется на этом этапе.
+   */
+  compositionVersionId?: string;
+  /**
+   * Закреплённый снимок управляемых правил комплектации (ADR-07 Q7-07/Q7-11).
+   * Optional-метаданные-ссылка; `schemaVersion` не повышается. У легаси-проектов
+   * отсутствует — новый расчёт блокируется, чтение сохранённых данных разрешено.
+   */
+  rulesSnapshotId?: string;
+  /** Версии ссылок Reference Data (§6.2/§6.3/§7.7, CA-T-108). */
+  pins?: ProjectPins;
+  /** История расчётов (CA-T-306E); у старых записей отсутствует → []. */
+  priceHistory?: ProjectPriceHistory[];
   price: PriceBreakdown;
   createdAt: string;
   updatedAt: string;

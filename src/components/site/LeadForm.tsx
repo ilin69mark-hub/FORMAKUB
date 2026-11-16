@@ -15,7 +15,8 @@ import type {
   FurnitureConfig,
   FurnitureInterest,
 } from "@/lib/configurator/types";
-import { calculatePrice, formatRub, kitchenTotalWidth } from "@/lib/configurator/pricing";
+import { formatRub, kitchenTotalWidth } from "@/lib/configurator/display";
+import { useCalculationInputs } from "@/lib/configurator/use-calculation-inputs";
 import { isConfigValid, validateConfig } from "@/lib/configurator/validation";
 import { loadLocalDraft } from "@/lib/configurator/storage";
 import { FURNITURE_TYPES } from "@/content/catalog";
@@ -46,6 +47,8 @@ interface LeadFormProps {
   submitLabel?: string;
   hideIntro?: boolean;
   onSuccess?: (leadId: string) => void;
+  /** CA-GL-25: сохранённый проект, к которому относится заявка. */
+  projectId?: string | null;
 }
 
 interface SuccessState {
@@ -57,7 +60,7 @@ function configSummary(config: FurnitureConfig): string {
   if (config.kind === "kitchen") {
     return `${Math.round(kitchenTotalWidth(config))} см · ${config.modules.length} модул.`;
   }
-  const width = config.sections.reduce((sum, section) => sum + section.width, 0);
+  const width = config.widthMm / 10;
   return `${Math.round(width)} × ${Math.round(config.height)} см · ${config.sections.length} секц.`;
 }
 
@@ -68,6 +71,7 @@ export function LeadForm({
   submitLabel = "Отправить заявку",
   hideIntro = false,
   onSuccess,
+  projectId = null,
 }: LeadFormProps) {
   const [config, setConfig] = useState<FurnitureConfig | null>(initialConfig);
   const [interest, setInterest] = useState<FurnitureInterest>(
@@ -97,10 +101,7 @@ export function LeadForm({
     return () => window.clearTimeout(timer);
   }, [initialConfig, autoAttachDraft]);
 
-  const preview = useMemo(() => {
-    if (!config) return null;
-    return calculatePrice(config);
-  }, [config]);
+  const { price: preview } = useCalculationInputs(config);
 
   const attachedInvalid = useMemo(() => {
     if (!config) return null;
@@ -144,6 +145,7 @@ export function LeadForm({
           interest: config ? undefined : interest,
           source,
           website,
+          ...(projectId ? { projectId } : {}),
           customer: {
             name: name.trim(),
             contact: contact.trim(),

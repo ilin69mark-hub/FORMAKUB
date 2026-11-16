@@ -36,6 +36,13 @@ COPY --from=builder /app/public ./public
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# Постоянный каталог данных (ADR-01: formakub.db в Docker volume).
+# Named volume при первом монтировании наследует содержимое и права образа:
+# каталог принадлежит пользователю приложения (nextjs), запись БД доступна,
+# пересоздание контейнера не создаёт «чужой» root-каталог.
+RUN mkdir -p /app/data
+RUN chown nextjs:nodejs /app/data
+
 # Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

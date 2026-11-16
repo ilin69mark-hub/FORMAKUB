@@ -10,7 +10,7 @@
  * Поддерживаемая версия структуры сохранённого проекта.
  * Записи без `schemaVersion` трактуются как v1 (дизайн §5.4, CA-T-104).
  */
-export const SUPPORTED_SCHEMA_VERSION = 1;
+export const SUPPORTED_SCHEMA_VERSION = 2;
 
 /**
  * Константа сборки расчётного движка (`StoredProject.calcVersion`).
@@ -19,4 +19,4 @@ export const SUPPORTED_SCHEMA_VERSION = 1;
  * Значение меняется только при релизе, изменяющем расчётные правила
  * (дизайн §5.2); молчаливая подмена версии проекта запрещена (§5.4).
  */
-export const BUILD_CALC_VERSION = "calc-2026.11.0";
+export const BUILD_CALC_VERSION = "calc-2026.11.2";

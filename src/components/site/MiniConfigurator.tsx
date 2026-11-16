@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
@@ -15,7 +15,8 @@ import {
   KITCHEN_MODULES,
 } from "@/content/catalog";
 import { defaultKitchen, makeKitchenModule } from "@/lib/configurator/defaults";
-import { calculatePrice, kitchenTotalWidth } from "@/lib/configurator/pricing";
+import { kitchenTotalWidth } from "@/lib/configurator/display";
+import { useCalculationInputs } from "@/lib/configurator/use-calculation-inputs";
 import { saveLocalDraft } from "@/lib/configurator/storage";
 import type { KitchenConfig } from "@/lib/configurator/types";
 import { KitchenScene } from "@/components/configurator/KitchenScene";
@@ -36,7 +37,7 @@ export function MiniConfigurator() {
     null;
   const selectedModuleId = selected?.id ?? null;
   const preset = selected ? KITCHEN_MODULES[selected.type] : null;
-  const price = useMemo(() => calculatePrice(config), [config]);
+  const { price } = useCalculationInputs(config);
   const totalWidth = Math.round(kitchenTotalWidth(config));
   const wallCount = config.modules.filter((module) => module.type === "wall").length;
 

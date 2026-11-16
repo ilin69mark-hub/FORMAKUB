@@ -9,7 +9,7 @@ import {
   Truck,
   Wallet,
 } from "lucide-react";
-import { PRICE_DISCLAIMER } from "@/lib/configurator/pricing";
+import { PRICE_DISCLAIMER } from "@/lib/configurator/display";
 import { LEGAL_NOTICE, SITE } from "@/content/site";
 
 export const metadata: Metadata = {

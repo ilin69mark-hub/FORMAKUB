@@ -1,12 +1,17 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, ArrowUpRight, Layers3, Ruler, ShieldCheck } from "lucide-react";
-import { calculatePrice, formatRub, kitchenTotalWidth } from "@/lib/configurator/pricing";
+import { formatRub, kitchenTotalWidth } from "@/lib/configurator/display";
 import { defaultKitchen } from "@/lib/configurator/defaults";
+import { useCalculationInputs } from "@/lib/configurator/use-calculation-inputs";
+
+const DEMO_KITCHEN = defaultKitchen();
 
 export function Hero() {
-  const demo = defaultKitchen();
-  const price = calculatePrice(demo);
+  const demo = DEMO_KITCHEN;
+  const { price } = useCalculationInputs(demo);
   const width = Math.round(kitchenTotalWidth(demo));
 
   return (
@@ -119,7 +124,7 @@ export function Hero() {
                         Ориентир
                       </div>
                       <div className="mt-1 font-display text-xl text-cream sm:text-2xl">
-                        {formatRub(price.total)}
+                        {price ? formatRub(price.total) : "—"}
                       </div>
                     </div>
                   </div>

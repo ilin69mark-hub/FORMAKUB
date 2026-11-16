@@ -10,7 +10,17 @@ import type {
   PlinthMountId,
   WardrobeConfig,
 } from "./types";
-import { KITCHEN_LIMITS, KITCHEN_MODULES, WARDROBE_LIMITS, snapCountertopThickness } from "@/content/catalog";
+import {
+  DEFAULT_FACADE_THICKNESS_MM,
+  KITCHEN_LIMITS,
+  KITCHEN_MODULES,
+  WARDROBE_LIMITS,
+  defaultFacadeThickness,
+  snapCountertopThickness,
+  snapFacadeThickness,
+} from "@/content/catalog";
+import { kitchenMaxBodyDepthCm, KITCHEN_MIN_BODY_DEPTH_CM } from "./geometry";
+import { FIXED_BODY_MATERIAL_ID } from "./materials";
 import {
   LED_COLOR_TEMPS,
   LED_DIFFUSERS,
@@ -187,11 +197,12 @@ export function defaultKitchen(): KitchenConfig {
       makeKitchenModule("wall", { id: "m-wall-1", width: 60, shelves: 1 }),
       makeKitchenModule("wall", { id: "m-wall-2", width: 60, shelves: 1 }),
     ],
-    bodyMaterial: "mdf",
-    bodyFinish: "sand",
+    bodyMaterial: "ldsp",
+    bodyFinish: "milk",
     facadeMaterial: "mdf",
     facadeFinish: "graphite",
     facadeStyle: "flat",
+    facadeThickness: defaultFacadeThickness("mdf"),
     countertop: "ldsp_hpl",
     countertopThickness: 38,
     handle: "profile",
@@ -208,19 +219,14 @@ export function defaultKitchen(): KitchenConfig {
   };
 }
 
-function defaultSection(index: number, width: number): WardrobeConfig["sections"][number] {
+function defaultSection(index: number): WardrobeConfig["sections"][number] {
   const shelves =
-    index === 1
-      ? [80, 120]
-      : index === 3
-        ? [80, 120, 160, 200]
-        : [80, 120, 160];
+    index === 1 ? [80, 120] : [80, 120, 160];
   return {
     id: `s-${index}`,
-    width,
     shelves,
-    rods: index === 1 ? [] : [210],
-    drawers: index === 1 ? 3 : 0,
+    rods: index === 1 ? [210] : [],
+    drawers: index === 2 ? 3 : 0,
   };
 }
 
@@ -229,18 +235,28 @@ export function defaultWardrobe(): WardrobeConfig {
     version: 1,
     kind: "wardrobe",
     height: 240,
-    depth: 60,
-    sections: [defaultSection(1, 80), defaultSection(2, 80), defaultSection(3, 80)],
-    bodyMaterial: "plywood",
-    bodyFinish: "birch",
-    facadeMaterial: "veneer",
-    facadeFinish: "oak",
+    widthMm: 2400,
+    fullDepth: 600,
+    sections: [defaultSection(1), defaultSection(2)],
+    bodyMaterial: "ldsp",
+    bodyFinish: "oak",
+    bodyThicknessMm: 16,
+    backPanelThicknessMm: 3,
+    plinthHeightMm: 80,
+    plinthInsetMm: 50,
+    partition: { positionMm: 1200 },
+    antresol: null,
+    facadeMaterial: "ldsp",
+    facadeThickness: 16,
+    facadeMount: "overlay",
+    facadeFinish: "milk",
     facadeStyle: "handleless",
     handle: "profile",
     hinge: "soft",
     pushToOpen: false,
     plinth: true,
     ledLighting: true,
+    hardware: {},
     promoCode: "",
   };
 }
@@ -250,30 +266,24 @@ export function defaultDressingRoom(): WardrobeConfig {
   return {
     ...base,
     height: 250,
+    widthMm: 2400,
+    partition: { positionMm: 1200 },
     sections: [
       {
         id: "s-1",
-        width: 90,
         shelves: [70, 110, 150, 190],
         rods: [225],
         drawers: 0,
       },
       {
         id: "s-2",
-        width: 90,
         shelves: [110, 150],
         rods: [225],
         drawers: 4,
       },
-      {
-        id: "s-3",
-        width: 90,
-        shelves: [50, 90, 130, 170, 210],
-        rods: [],
-        drawers: 0,
-      },
     ],
-    facadeMaterial: "mdf",
+    facadeMaterial: "mdf_pvc",
+    facadeThickness: 19,
     facadeFinish: "milk",
     facadeStyle: "flat",
     ledLighting: true,
@@ -290,18 +300,39 @@ export function cloneConfig<T extends FurnitureConfig>(config: T): T {
   return JSON.parse(JSON.stringify(config)) as T;
 }
 
-export function normalizeKitchenDepth(config: KitchenConfig): KitchenConfig {
+export function normalizeKitchenDepth(
+  config: KitchenConfig,
+  facadeThickness = config.facadeThickness,
+): KitchenConfig {
+  const thickness = Number.isFinite(facadeThickness)
+    ? facadeThickness
+    : DEFAULT_FACADE_THICKNESS_MM;
   const targetFor = (zone: "floor" | "upper"): number | null => {
     const modules = config.modules.filter(
       (module) => KITCHEN_MODULES[module.type].zone === zone,
     );
     if (modules.length === 0) return null;
-    const min = Math.max(
-      ...modules.map((module) => KITCHEN_MODULES[module.type].minDepth),
-    );
-    const max = Math.min(
+    const min =
+      zone === "floor"
+        ? Math.max(
+            KITCHEN_MIN_BODY_DEPTH_CM,
+            ...modules.map((module) => KITCHEN_MODULES[module.type].minDepth),
+          )
+        : Math.max(
+            ...modules.map((module) => KITCHEN_MODULES[module.type].minDepth),
+          );
+    const staticMax = Math.min(
       ...modules.map((module) => KITCHEN_MODULES[module.type].maxDepth),
     );
+    const hasStandardLower =
+      zone === "floor" &&
+      modules.some(
+        (module) => module.type !== "tall" && module.type !== "oven",
+      );
+    const dynamicMax = hasStandardLower
+      ? kitchenMaxBodyDepthCm(thickness)
+      : staticMax;
+    const max = Math.min(staticMax, dynamicMax);
     return Math.min(max, Math.max(min, modules[0].depth));
   };
 
@@ -325,7 +356,11 @@ export function normalizeKitchenDepth(config: KitchenConfig): KitchenConfig {
  * перегородки, обрезка наполнения секций).
  */
 export function normalizeKitchen(config: KitchenConfig): KitchenConfig {
-  const depthFixed = normalizeKitchenDepth(config);
+  const facadeThickness = snapFacadeThickness(
+    config.facadeMaterial,
+    config.facadeThickness,
+  );
+  const depthFixed = normalizeKitchenDepth(config, facadeThickness);
   const plinthHeight = Number.isFinite(config.plinthHeight)
     ? Math.min(
         KITCHEN_LIMITS.maxPlinthHeight,
@@ -340,9 +375,21 @@ export function normalizeKitchen(config: KitchenConfig): KitchenConfig {
   const plinth = normalizePlinthOptions(config);
   const lighting = normalizeLighting(config.lighting);
   const supports = normalizeSupportSettings(config.supports);
+  // R6 (DOMAIN_CONFIRMED): подсветка верхнего ряда существует только вместе
+  // с верхними модулями. Удаление последнего верхнего модуля гасит опцию
+  // (все LED-позиции обнуляются при расчёте), повторное добавление модулей
+  // доступность возвращает, но подсветку само не включает.
+  const hasUpperModules = depthFixed.modules.some(
+    (module) => KITCHEN_MODULES[module.type]?.zone === "upper",
+  );
+  const underCabinetLighting =
+    hasUpperModules && config.underCabinetLighting === true;
   return {
     ...depthFixed,
+    bodyMaterial: FIXED_BODY_MATERIAL_ID,
+    facadeThickness,
     plinthHeight,
+    underCabinetLighting,
     ...plinth,
     lighting,
     supports,
@@ -354,6 +401,48 @@ export function normalizeKitchen(config: KitchenConfig): KitchenConfig {
       normalizeSinkModule(module, sinkRowContext(depthFixed.modules, module.id)),
     ),
   };
+}
+
+/**
+ * Привести фасад и глубину только стандартных нижних модулей к допустимым
+ * значениям (CA-T-513). `tall`/`oven` не меняются: их геометрия вне правила
+ * глубины нижнего корпуса.
+ */
+export function normalizeKitchenFacadeDepth(
+  config: KitchenConfig,
+): KitchenConfig {
+  const facadeThickness = snapFacadeThickness(
+    config.facadeMaterial,
+    config.facadeThickness,
+  );
+  const maxBodyDepth = kitchenMaxBodyDepthCm(facadeThickness);
+  return {
+    ...config,
+    facadeThickness,
+    modules: config.modules.map((module) => {
+      const isStandardLower =
+        KITCHEN_MODULES[module.type].zone === "floor" &&
+        module.type !== "tall" &&
+        module.type !== "oven";
+      if (!isStandardLower) return module;
+      const depth = Math.min(
+        maxBodyDepth,
+        Math.max(KITCHEN_MIN_BODY_DEPTH_CM, module.depth),
+      );
+      return depth === module.depth ? module : { ...module, depth };
+    }),
+  };
+}
+
+/** Применить толщину фасада и скорректировать глубину нижних модулей. */
+export function withKitchenFacadeThickness(
+  config: KitchenConfig,
+  thickness: number,
+): KitchenConfig {
+  return normalizeKitchenFacadeDepth({
+    ...config,
+    facadeThickness: snapFacadeThickness(config.facadeMaterial, thickness),
+  });
 }
 
 export function nextShelfPosition(

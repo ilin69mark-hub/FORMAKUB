@@ -9,10 +9,12 @@ export function LeadModal({
   open,
   config,
   onClose,
+  projectId = null,
 }: {
   open: boolean;
   config: FurnitureConfig;
   onClose: () => void;
+  projectId?: string | null;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -72,6 +74,7 @@ export function LeadModal({
           </button>
         </div>
         <LeadForm
+          projectId={projectId}
           initialConfig={config}
           source={`configurator-${config.kind}`}
           submitLabel="Отправить заявку"

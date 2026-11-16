@@ -3,6 +3,11 @@ import type {
   KitchenSinkPosition,
   KitchenSinkStorage,
 } from "./types";
+import {
+  FACADE_DOOR_GAP_CM,
+  FACADE_EDGE_GAP_CM,
+  FACADE_NEIGHBOR_GAP_CM,
+} from "./facade-geometry";
 
 /**
  * Конструктивные правила модуля под мойку с распашными фасадами.
@@ -13,7 +18,36 @@ import type {
  * приняты как демо-параметры на основе типовой корпусной мебели и требуют
  * подтверждения конструктором — см. открытые вопросы в отчёте.
  */
-export const SINK_RULES = {
+/** Типизированные конструктивные правила модуля под мойку (CA-T-306E E2). */
+export interface SinkRules {
+  readonly minWidth: number;
+  readonly maxWidth: number;
+  readonly widthStep: number;
+  readonly standardWidths: readonly number[];
+  readonly sidePanel: number;
+  readonly partition: number;
+  readonly facadeGap: number;
+  readonly partitionMinWidth: number;
+  readonly threeDoorMinWidth: number;
+  readonly maxShelvesPerSection: number;
+  readonly maxDrawersPerSection: number;
+  readonly minSectionOuterWidthForDrawers: number;
+  readonly mountEdge: number;
+  readonly innerMount: number;
+  readonly sinkStep: number;
+  readonly minSinkWidth: number;
+  readonly maxSinkWidth: number;
+  readonly minSinkDepth: number;
+  readonly maxSinkDepth: number;
+  readonly minStorageSectionWidth: number;
+  readonly facadeEdgeGap: number;
+  readonly facadeNeighborGap: number;
+  readonly facadeInnerGap: number;
+  readonly bottleBodies: readonly number[];
+  readonly bottleClearOffset: number;
+}
+
+export const SINK_RULES: SinkRules = {
   minWidth: 40,
   maxWidth: 120,
   widthStep: 5,
@@ -59,21 +93,201 @@ export const SINK_RULES = {
    */
   minStorageSectionWidth: 100,
   /** Монтажный зазор фасада: 2 мм у края ряда, 1 мм к соседнему модулю, см. */
-  facadeEdgeGap: 0.2,
-  facadeNeighborGap: 0.1,
+  facadeEdgeGap: FACADE_EDGE_GAP_CM,
+  facadeNeighborGap: FACADE_NEIGHBOR_GAP_CM,
   /** Зазор между створками одного модуля, см (2 мм → по 1 мм на створку). */
-  facadeInnerGap: 0.1,
+  facadeInnerGap: FACADE_DOOR_GAP_CM,
   /** Бутылочница: корпуса, см (чистый проём = корпус − 32 мм: 118/168/268). */
   bottleBodies: [15, 20, 30] as const,
   bottleClearOffset: 3.2,
-} as const;
+};
+
+/**
+ * Полный список ключей SinkRules (25 параметров). Используется строгим
+ * парсером manifest-параметров и тестами полноты.
+ */
+export const SINK_RULE_NAMES: readonly (keyof SinkRules)[] = [
+  "minWidth",
+  "maxWidth",
+  "widthStep",
+  "standardWidths",
+  "sidePanel",
+  "partition",
+  "facadeGap",
+  "partitionMinWidth",
+  "threeDoorMinWidth",
+  "maxShelvesPerSection",
+  "maxDrawersPerSection",
+  "minSectionOuterWidthForDrawers",
+  "mountEdge",
+  "innerMount",
+  "sinkStep",
+  "minSinkWidth",
+  "maxSinkWidth",
+  "minSinkDepth",
+  "maxSinkDepth",
+  "minStorageSectionWidth",
+  "facadeEdgeGap",
+  "facadeNeighborGap",
+  "facadeInnerGap",
+  "bottleBodies",
+  "bottleClearOffset",
+];
+
+type RuleKind = "positive" | "nonNegative" | "integer" | "numberArray";
+
+const RULE_KINDS: Record<keyof SinkRules, RuleKind> = {
+  minWidth: "positive",
+  maxWidth: "positive",
+  widthStep: "positive",
+  standardWidths: "numberArray",
+  sidePanel: "nonNegative",
+  partition: "nonNegative",
+  facadeGap: "nonNegative",
+  partitionMinWidth: "positive",
+  threeDoorMinWidth: "positive",
+  maxShelvesPerSection: "integer",
+  maxDrawersPerSection: "integer",
+  minSectionOuterWidthForDrawers: "positive",
+  mountEdge: "nonNegative",
+  innerMount: "nonNegative",
+  sinkStep: "positive",
+  minSinkWidth: "positive",
+  maxSinkWidth: "positive",
+  minSinkDepth: "positive",
+  maxSinkDepth: "positive",
+  minStorageSectionWidth: "positive",
+  facadeEdgeGap: "nonNegative",
+  facadeNeighborGap: "nonNegative",
+  facadeInnerGap: "nonNegative",
+  bottleBodies: "numberArray",
+  bottleClearOffset: "positive",
+};
+
+const SINK_PARAMETER_PREFIX = "engine.sink.";
+
+function ruleError(message: string): never {
+  throw new Error(`SinkRules: ${message}`);
+}
+
+function readRuleNumber(key: string, value: unknown, kind: RuleKind): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    ruleError(`${key}: ожидалось конечное число`);
+  }
+  if (kind === "integer") {
+    if (!Number.isInteger(value) || value < 0) {
+      ruleError(`${key}: ожидалось неотрицательное целое число`);
+    }
+  } else if (kind === "positive") {
+    if (!(value > 0)) ruleError(`${key}: ожидалось положительное число`);
+  } else if (kind === "nonNegative") {
+    if (!(value >= 0)) ruleError(`${key}: ожидалось неотрицательное число`);
+  } else {
+    ruleError(`${key}: ожидался массив чисел`);
+  }
+  return value;
+}
+
+function readRuleArray(key: string, value: unknown): readonly number[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    ruleError(`${key}: ожидался непустой массив чисел`);
+  }
+  const values: number[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry !== "number" || !Number.isFinite(entry) || !(entry > 0)) {
+      ruleError(`${key}[${index}]: ожидалось положительное конечное число`);
+    }
+    values.push(entry);
+  }
+  if (new Set(values).size !== values.length) {
+    ruleError(`${key}: дубликаты недопустимы`);
+  }
+  return Object.freeze(values);
+}
+
+/**
+ * Строгий fail-closed разбор 25 параметров `engine.sink.*` из manifest.
+ * Значения по умолчанию не подставляются: отсутствие любого параметра,
+ * неизвестный `engine.sink.*` ключ, неверный тип или нарушение взаимных
+ * ограничений — ошибка.
+ */
+export function sinkRulesFromParameters(
+  parameters: Readonly<Record<string, unknown>>,
+): SinkRules {
+  if (
+    parameters === null ||
+    typeof parameters !== "object" ||
+    Array.isArray(parameters)
+  ) {
+    ruleError("parameters должен быть объектом");
+  }
+
+  for (const key of Object.keys(parameters)) {
+    if (!key.startsWith(SINK_PARAMETER_PREFIX)) continue;
+    const name = key.slice(SINK_PARAMETER_PREFIX.length);
+    if (!(name in RULE_KINDS)) {
+      ruleError(`неизвестный параметр ${key}`);
+    }
+  }
+
+  const values: Partial<Record<keyof SinkRules, number | readonly number[]>> = {};
+  for (const name of SINK_RULE_NAMES) {
+    const key = `${SINK_PARAMETER_PREFIX}${name}`;
+    if (!Object.prototype.hasOwnProperty.call(parameters, key)) {
+      ruleError(`отсутствует параметр ${key}`);
+    }
+    const raw = parameters[key];
+    const kind = RULE_KINDS[name];
+    values[name] =
+      kind === "numberArray"
+        ? readRuleArray(key, raw)
+        : readRuleNumber(key, raw, kind);
+  }
+
+  const rules = values as unknown as SinkRules;
+  if (rules.minWidth > rules.maxWidth) {
+    ruleError("minWidth не может быть больше maxWidth");
+  }
+  if (rules.minSinkWidth > rules.maxSinkWidth) {
+    ruleError("minSinkWidth не может быть больше maxSinkWidth");
+  }
+  if (rules.minSinkDepth > rules.maxSinkDepth) {
+    ruleError("minSinkDepth не может быть больше maxSinkDepth");
+  }
+  if (rules.maxShelvesPerSection < 0 || rules.maxDrawersPerSection < 0) {
+    ruleError("лимиты наполнения секции не могут быть отрицательными");
+  }
+  for (const width of rules.standardWidths) {
+    if (width < rules.minWidth || width > rules.maxWidth) {
+      ruleError(
+        `standardWidths: ${width} вне диапазона ${rules.minWidth}–${rules.maxWidth}`,
+      );
+    }
+    const steps = width / rules.widthStep;
+    if (Math.abs(steps - Math.round(steps)) > 1e-9) {
+      ruleError(`standardWidths: ${width} не кратно widthStep`);
+    }
+  }
+  for (const body of rules.bottleBodies) {
+    if (!(body > rules.bottleClearOffset)) {
+      ruleError(
+        `bottleBodies: ${body} должно быть больше bottleClearOffset`,
+      );
+    }
+  }
+
+  return Object.freeze(rules);
+}
 
 /**
  * Наружная ширина секции: внутренняя ширина + две стенки по 16 мм.
  * Ящики и бутылочница задаются наружным габаритом.
  */
-export function sectionOuterWidth(inner: number): number {
-  return inner + 2 * SINK_RULES.partition;
+export function sectionOuterWidth(
+  inner: number,
+  rules: SinkRules = SINK_RULES,
+): number {
+  return inner + 2 * rules.partition;
 }
 
 /**
@@ -83,10 +297,13 @@ export function sectionOuterWidth(inner: number): number {
  * поэтому строгое сравнение с 30 см браковало легальную секцию 29.875 см
  * (1200 мм, мойка 50 по центру, 2 фасада).
  */
-export function sectionFitsDrawers(inner: number): boolean {
+export function sectionFitsDrawers(
+  inner: number,
+  rules: SinkRules = SINK_RULES,
+): boolean {
   return (
-    sectionOuterWidth(inner) + SINK_RULES.facadeGap / 2 + 1e-6 >=
-    SINK_RULES.minSectionOuterWidthForDrawers
+    sectionOuterWidth(inner, rules) + rules.facadeGap / 2 + 1e-6 >=
+    rules.minSectionOuterWidthForDrawers
   );
 }
 
@@ -99,9 +316,10 @@ export function sectionFitsDrawers(inner: number): boolean {
 export function isBottleEdgeSection(
   section: Pick<SinkSectionLayout, "x" | "width">,
   widthCm: number,
+  rules: SinkRules = SINK_RULES,
 ): boolean {
-  const side = SINK_RULES.sidePanel;
-  const width = snapSinkWidth(widthCm);
+  const side = rules.sidePanel;
+  const width = snapSinkWidth(widthCm, rules);
   return (
     section.x <= side + 0.001 ||
     section.x + section.width >= width - side - 0.001
@@ -163,11 +381,12 @@ const COUNTERTOP_MODULE_TYPES: readonly string[] = [
 /** Боковые монтажные отступы мойки, мм: 50 у края столешницы, 0 к соседу. */
 export function sinkRowMargins(
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): { left: number; right: number } {
   const context = row ?? SINK_ROW_EDGE_BOTH;
   return {
-    left: context.leftEdge ? SINK_RULES.mountEdge : SINK_RULES.innerMount,
-    right: context.rightEdge ? SINK_RULES.mountEdge : SINK_RULES.innerMount,
+    left: context.leftEdge ? rules.mountEdge : rules.innerMount,
+    right: context.rightEdge ? rules.mountEdge : rules.innerMount,
   };
 }
 
@@ -266,7 +485,7 @@ export interface SinkLayout {
   sections: SinkSectionLayout[];
   /**
    * Створки фасада с учётом монтажных зазоров (2 мм у края ряда, 1 мм к
-   * соседу, 1 мм между створками). Шов крайней створки — на осевой
+   * соседу, 2 мм между створками суммарно). Шов крайней створки — на осевой
    * перегородки. Для рендера; структурные doorXs/doorWidth — для секций.
    */
   facadeBoxes: SinkFacadeBox[];
@@ -339,20 +558,26 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** Округляет значение к шагу 10 мм (1 см). */
-export function snapMm(value: number): number {
+export function snapMm(value: number, rules: SinkRules = SINK_RULES): number {
   const safe = Number.isFinite(value) ? value : 0;
-  return Math.round(safe / SINK_RULES.sinkStep) * SINK_RULES.sinkStep;
+  return Math.round(safe / rules.sinkStep) * rules.sinkStep;
 }
 
 /** Округляет ширину корпуса к шагу 5 см и зажимает в диапазон 40–120 см. */
-export function snapSinkWidth(width: number): number {
-  const safe = Number.isFinite(width) ? width : SINK_RULES.minWidth;
-  const snapped = Math.round(safe / SINK_RULES.widthStep) * SINK_RULES.widthStep;
-  return clamp(snapped, SINK_RULES.minWidth, SINK_RULES.maxWidth);
+export function snapSinkWidth(
+  width: number,
+  rules: SinkRules = SINK_RULES,
+): number {
+  const safe = Number.isFinite(width) ? width : rules.minWidth;
+  const snapped = Math.round(safe / rules.widthStep) * rules.widthStep;
+  return clamp(snapped, rules.minWidth, rules.maxWidth);
 }
 
-export function isSinkStandardWidth(width: number): boolean {
-  return (SINK_RULES.standardWidths as readonly number[]).includes(width);
+export function isSinkStandardWidth(
+  width: number,
+  rules: SinkRules = SINK_RULES,
+): boolean {
+  return rules.standardWidths.includes(width);
 }
 
 export function isSinkStandardSize(widthMm: number, depthMm: number): boolean {
@@ -365,26 +590,30 @@ export function isSinkStandardSize(widthMm: number, depthMm: number): boolean {
 export function maxSinkWidthFor(
   moduleWidthCm: number,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): number {
-  const moduleWidth = snapSinkWidth(moduleWidthCm) * 10;
-  const margins = sinkRowMargins(row);
+  const moduleWidth = snapSinkWidth(moduleWidthCm, rules) * 10;
+  const margins = sinkRowMargins(row, rules);
   return Math.max(
-    SINK_RULES.minSinkWidth,
+    rules.minSinkWidth,
     Math.min(
-      SINK_RULES.maxSinkWidth,
+      rules.maxSinkWidth,
       moduleWidth - margins.left - margins.right,
     ),
   );
 }
 
 /** Максимально допустимая глубина мойки для корпуса, мм. */
-export function maxSinkDepthFor(moduleDepthCm: number): number {
+export function maxSinkDepthFor(
+  moduleDepthCm: number,
+  rules: SinkRules = SINK_RULES,
+): number {
   const moduleDepth = (Number.isFinite(moduleDepthCm) ? moduleDepthCm : 60) * 10;
   return Math.max(
-    SINK_RULES.minSinkDepth,
+    rules.minSinkDepth,
     Math.min(
-      SINK_RULES.maxSinkDepth,
-      moduleDepth - 2 * SINK_RULES.mountEdge,
+      rules.maxSinkDepth,
+      moduleDepth - 2 * rules.mountEdge,
     ),
   );
 }
@@ -393,40 +622,52 @@ export function clampSinkWidth(
   value: number,
   moduleWidthCm: number,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): number {
   return clamp(
-    snapMm(value),
-    SINK_RULES.minSinkWidth,
-    maxSinkWidthFor(moduleWidthCm, row),
+    snapMm(value, rules),
+    rules.minSinkWidth,
+    maxSinkWidthFor(moduleWidthCm, row, rules),
   );
 }
 
-export function clampSinkDepth(value: number, moduleDepthCm: number): number {
+export function clampSinkDepth(
+  value: number,
+  moduleDepthCm: number,
+  rules: SinkRules = SINK_RULES,
+): number {
   return clamp(
-    snapMm(value),
-    SINK_RULES.minSinkDepth,
-    maxSinkDepthFor(moduleDepthCm),
+    snapMm(value, rules),
+    rules.minSinkDepth,
+    maxSinkDepthFor(moduleDepthCm, rules),
   );
 }
 
 /** Количество фасадов: явное значение из конфигурации либо 2 по умолчанию. */
 export function sinkFacadeCount(
   module: Pick<KitchenModule, "width" | "sinkFacades">,
+  rules: SinkRules = SINK_RULES,
 ): SinkFacadeCount {
   if (module.sinkFacades === 3) {
-    return snapSinkWidth(module.width) >= SINK_RULES.threeDoorMinWidth ? 3 : 2;
+    return snapSinkWidth(module.width, rules) >= rules.threeDoorMinWidth ? 3 : 2;
   }
   return 2;
 }
 
 /** Доступна ли конструкция с тремя фасадами для данной ширины. */
-export function sinkThreeDoorAvailable(width: number): boolean {
-  return snapSinkWidth(width) >= SINK_RULES.threeDoorMinWidth;
+export function sinkThreeDoorAvailable(
+  width: number,
+  rules: SinkRules = SINK_RULES,
+): boolean {
+  return snapSinkWidth(width, rules) >= rules.threeDoorMinWidth;
 }
 
 /** Доступна ли дополнительная перегородка для данной ширины (2 фасада). */
-export function sinkPartitionAvailable(width: number): boolean {
-  return snapSinkWidth(width) >= SINK_RULES.partitionMinWidth;
+export function sinkPartitionAvailable(
+  width: number,
+  rules: SinkRules = SINK_RULES,
+): boolean {
+  return snapSinkWidth(width, rules) >= rules.partitionMinWidth;
 }
 
 /**
@@ -454,10 +695,11 @@ function threeFacadePartitionGapIndex(
 export function sinkPartitionCount(
   module: SinkPartitionSource,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): number {
-  if (sinkFacadeCount(module) === 3)
+  if (sinkFacadeCount(module, rules) === 3)
     return threeFacadePartitionGapIndex(module.sinkPosition) >= 0 ? 1 : 0;
-  return autoPartitionSides(module, row).length;
+  return autoPartitionSides(module, row, rules).length;
 }
 
 /**
@@ -480,17 +722,20 @@ export function sinkPartitionCount(
 export function sinkGeometry(
   module: SinkModuleFields,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): SinkGeometry {
-  const moduleWidth = snapSinkWidth(module.width) * 10;
-  const margins = sinkRowMargins(row);
+  const moduleWidth = snapSinkWidth(module.width, rules) * 10;
+  const margins = sinkRowMargins(row, rules);
   const width = clampSinkWidth(
     module.sinkWidth ?? SINK_DEFAULTS.width,
     module.width,
     row,
+    rules,
   );
   const depth = clampSinkDepth(
     module.sinkDepth ?? SINK_DEFAULTS.depth,
     module.depth,
+    rules,
   );
 
   const position: KitchenSinkPosition = module.sinkPosition ?? "center";
@@ -500,7 +745,7 @@ export function sinkGeometry(
   const sideMaxMargin = position === "right" ? margins.left : margins.right;
   const minOffset = sideMin;
   const maxOffset = Math.max(minOffset, moduleWidth - width - sideMaxMargin);
-  const requested = snapMm(module.sinkOffset ?? minOffset);
+  const requested = snapMm(module.sinkOffset ?? minOffset, rules);
   const offset = clamp(requested, minOffset, maxOffset);
 
   // Достижимость центра: (W − sinkW)/2 должен покрывать оба отступа.
@@ -587,14 +832,15 @@ function resolvePartitionBox(
   geom: SinkGeometry,
   ideal: { x: number; width: number },
   prefer: "right" | "left",
+  rules: SinkRules,
 ): { x: number; width: number } | null {
   if (!intersectsZone(ideal.x, ideal.width, geom.zoneLeft, geom.zoneRight)) {
     return ideal;
   }
-  const gap = SINK_RULES.facadeGap;
-  const part = SINK_RULES.partition;
-  const side = SINK_RULES.sidePanel;
-  const minFree = SINK_RULES.minStorageSectionWidth / 10;
+  const gap = rules.facadeGap;
+  const part = rules.partition;
+  const side = rules.sidePanel;
+  const minFree = rules.minStorageSectionWidth / 10;
   const zoneL = geom.zoneLeft / 10;
   const zoneR = geom.zoneRight / 10;
   const right = { x: zoneR + gap / 2, free: widthCm - side - (zoneR + gap / 2 + part) };
@@ -631,6 +877,7 @@ function applyBottleCut(
   zoneLeftCm: number,
   zoneRightCm: number,
   storage: KitchenSinkStorage[],
+  rules: SinkRules,
 ): { cuts: SinkPartitionBox[]; sections: SinkSectionLayout[]; conflict: boolean } {
   const baseSections = buildSections(
     widthCm,
@@ -638,6 +885,8 @@ function applyBottleCut(
     zoneLeftCm,
     zoneRightCm,
     storage,
+    [],
+    rules,
   );
   const bottleIdx = baseSections.findIndex(
     (item) => !item.comms && item.bottle > 0,
@@ -646,9 +895,9 @@ function applyBottleCut(
     return { cuts: partitions, sections: baseSections, conflict: false };
   }
   const section = baseSections[bottleIdx];
-  const side = SINK_RULES.sidePanel;
-  const part = SINK_RULES.partition;
-  const inner = section.bottle - SINK_RULES.bottleClearOffset;
+  const side = rules.sidePanel;
+  const part = rules.partition;
+  const inner = section.bottle - rules.bottleClearOffset;
   const atLeft = section.x <= side + 0.001;
   const atRight = section.x + section.width >= widthCm - side - 0.001;
   // Бутылочница ставится только у бокового края модуля: секция обязана
@@ -696,6 +945,7 @@ function applyBottleCut(
       zoneRightCm,
       storage,
       deadRanges,
+      rules,
     ),
     conflict: false,
   };
@@ -708,15 +958,18 @@ function applyBottleCut(
 function preferredShiftSide(
   widthCm: number,
   geom: SinkGeometry,
+  rules: SinkRules,
 ): "left" | "right" {
-  const side = SINK_RULES.sidePanel;
+  const side = rules.sidePanel;
   const zoneL = geom.zoneLeft / 10;
   const zoneR = geom.zoneRight / 10;
   return widthCm - side - zoneR >= zoneL - side ? "right" : "left";
 }
 
 /** Минимальная ширина створки для шва по осевой перегородки, см. */
-const MIN_DOOR_WIDTH = SINK_RULES.minStorageSectionWidth / 10;
+function minDoorWidth(rules: SinkRules): number {
+  return rules.minStorageSectionWidth / 10;
+}
 
 /**
  * Стороны зоны мойки, где нужна авто-перегородка при двух створках: по
@@ -727,22 +980,23 @@ const MIN_DOOR_WIDTH = SINK_RULES.minStorageSectionWidth / 10;
 export function autoPartitionSides(
   module: SinkPartitionSource,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): ("left" | "right")[] {
-  if (sinkFacadeCount(module) !== 2) return [];
-  const width = snapSinkWidth(module.width);
-  if (!sinkPartitionAvailable(width)) return [];
+  if (sinkFacadeCount(module, rules) !== 2) return [];
+  const width = snapSinkWidth(module.width, rules);
+  if (!sinkPartitionAvailable(width, rules)) return [];
   const storage = Array.isArray(module.sinkStorage) ? module.sinkStorage : [];
   const hasFills = storage.some(
     (fill) => (fill.shelves ?? 0) > 0 || (fill.drawers ?? 0) > 0,
   );
   if (!hasFills) return [];
-  const geom = sinkGeometry({ ...module, depth: module.depth ?? 60 }, row);
+  const geom = sinkGeometry({ ...module, depth: module.depth ?? 60 }, row, rules);
   const zoneLeftCm = geom.zoneLeft / 10;
   const zoneRightCm = geom.zoneRight / 10;
   // Предварительные секции без перегородок: зона мойки режет корпус на
   // коммуникации и секции хранения — fills распределяются слева направо,
   // как и в итоговом layout.
-  const provisional = buildSections(width, [], zoneLeftCm, zoneRightCm, storage);
+  const provisional = buildSections(width, [], zoneLeftCm, zoneRightCm, storage, [], rules);
   const sides: ("left" | "right")[] = [];
   for (const section of provisional) {
     if (section.comms) continue;
@@ -765,11 +1019,12 @@ function partitionBoxForSide(
   widthCm: number,
   geom: SinkGeometry,
   side: "left" | "right",
+  rules: SinkRules,
 ): { x: number; width: number } | null {
-  const gap = SINK_RULES.facadeGap;
-  const part = SINK_RULES.partition;
-  const edge = SINK_RULES.sidePanel;
-  const minFree = SINK_RULES.minStorageSectionWidth / 10;
+  const gap = rules.facadeGap;
+  const part = rules.partition;
+  const edge = rules.sidePanel;
+  const minFree = rules.minStorageSectionWidth / 10;
   const zoneL = geom.zoneLeft / 10;
   const zoneR = geom.zoneRight / 10;
   if (side === "left") {
@@ -798,7 +1053,7 @@ function partitionBoxForSide(
  *   панель доходит до края дверного поля (как створки);
  * - остаток поля (зоны коммуникаций и секции без наполнения) делят базовые
  *   створки (2/3) пропорционально по участкам, шов — на осевой перегородки.
- * Монтажные зазоры прежние: 2 мм у края ряда, 1 мм между панелями,
+ * Монтажные зазоры: 2 мм у края ряда, 2 мм между панелями суммарно,
  * створки перекрывают половину перегородки.
  */
 function computeFacadeBoxes(
@@ -808,9 +1063,11 @@ function computeFacadeBoxes(
   cuts: SinkPartitionBox[],
   leftGap: number,
   rightGap: number,
+  rules: SinkRules,
 ): SinkFacadeBox[] {
-  const inner = SINK_RULES.facadeInnerGap;
-  const side = SINK_RULES.sidePanel;
+  const inner = rules.facadeInnerGap;
+  const side = rules.sidePanel;
+  const minDoor = minDoorWidth(rules);
   const fieldL = leftGap;
   const fieldR = widthCm - rightGap;
   const near = (a: number, b: number) => Math.abs(a - b) < 0.001;
@@ -897,7 +1154,7 @@ function computeFacadeBoxes(
     if (count <= 1) return uniform(start, end, 1);
     const seam = cuts
       .map(seamOf)
-      .find((center) => center > start && center < end && center - start >= MIN_DOOR_WIDTH && end - center >= MIN_DOOR_WIDTH);
+      .find((center) => center > start && center < end && center - start >= minDoor && end - center >= minDoor);
     if (seam === undefined) return uniform(start, end, count);
     const leftWidth = seam - start;
     const rightWidth = end - seam;
@@ -960,22 +1217,23 @@ export function sinkPartitionConflicts(
     | "sinkStorage"
   >,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): boolean {
-  const width = snapSinkWidth(module.width);
-  if (sinkFacadeCount(module) !== 2) return false;
-  if (!sinkPartitionAvailable(width)) return false;
-  const geom = sinkGeometry(module, row);
+  const width = snapSinkWidth(module.width, rules);
+  if (sinkFacadeCount(module, rules) !== 2) return false;
+  if (!sinkPartitionAvailable(width, rules)) return false;
+  const geom = sinkGeometry(module, row, rules);
   // С наполнением — по сторонам с полками/ящиками: если хотя бы одну
   // перегородку некуда поставить, наполнение не крепится.
-  const sides = autoPartitionSides(module, row);
+  const sides = autoPartitionSides(module, row, rules);
   if (sides.length > 0) {
-    return sides.some((side) => partitionBoxForSide(width, geom, side) === null);
+    return sides.some((side) => partitionBoxForSide(width, geom, side, rules) === null);
   }
   // Без наполнения — предупреждаем, если перегородку невозможно поставить
   // ни с одной стороны (в корпус вообще не помещается секция ≥ 10 см).
   return (
-    partitionBoxForSide(width, geom, "left") === null &&
-    partitionBoxForSide(width, geom, "right") === null
+    partitionBoxForSide(width, geom, "left", rules) === null &&
+    partitionBoxForSide(width, geom, "right", rules) === null
   );
 }
 
@@ -995,8 +1253,9 @@ export interface SinkFacadeTotals {
 export function sinkFacadeTotals(
   module: Parameters<typeof sinkLayout>[0],
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): SinkFacadeTotals {
-  const layout = sinkLayout(module, undefined, row);
+  const layout = sinkLayout(module, undefined, row, rules);
   let doors = 0;
   let fronts = 0;
   let bottle = 0;
@@ -1012,6 +1271,7 @@ export function sinkFacadeTotals(
 export function normalizeSinkStorage(
   module: { sinkStorage?: KitchenSinkStorage[] },
   freeSections: number,
+  rules: SinkRules = SINK_RULES,
 ): KitchenSinkStorage[] {
   const source = Array.isArray(module.sinkStorage) ? module.sinkStorage : [];
   const result: KitchenSinkStorage[] = [];
@@ -1019,7 +1279,7 @@ export function normalizeSinkStorage(
     const fill = source[i] ?? { shelves: 0, drawers: 0 };
     // Бутылочница занимает секцию целиком — полки и ящики не сочетаются.
     const bottle: 0 | 15 | 20 | 30 = (
-      SINK_RULES.bottleBodies as readonly number[]
+      rules.bottleBodies
     ).includes(fill.bottle ?? 0)
       ? (fill.bottle as 15 | 20 | 30)
       : 0;
@@ -1027,10 +1287,10 @@ export function normalizeSinkStorage(
       result.push({ shelves: 0, drawers: 0, bottle });
       continue;
     }
-    const shelves = clamp(Math.round(fill.shelves) || 0, 0, SINK_RULES.maxShelvesPerSection);
+    const shelves = clamp(Math.round(fill.shelves) || 0, 0, rules.maxShelvesPerSection);
     let drawers = Math.round(fill.drawers) || 0;
     if (drawers > 0) {
-      drawers = clamp(drawers === 1 ? 2 : drawers, 2, SINK_RULES.maxDrawersPerSection);
+      drawers = clamp(drawers === 1 ? 2 : drawers, 2, rules.maxDrawersPerSection);
     } else {
       drawers = 0;
     }
@@ -1065,8 +1325,9 @@ function buildSections(
   zoneRightCm: number,
   storage: KitchenSinkStorage[],
   deadRanges: { start: number; end: number }[] = [],
+  rules: SinkRules = SINK_RULES,
 ): SinkSectionLayout[] {
-  const side = SINK_RULES.sidePanel;
+  const side = rules.sidePanel;
   const innerL = side;
   const innerR = width - side;
 
@@ -1114,7 +1375,7 @@ function buildSections(
   }
   // Слияние мелких свободных остатков: слишком узкий участок хранения
   // превращается в мёртвый зазор (коммуникации), геометрия границ не растягивается.
-  const minStorage = SINK_RULES.minStorageSectionWidth / 10;
+  const minStorage = rules.minStorageSectionWidth / 10;
   for (const segment of merged) {
     if (!segment.comms && segment.end - segment.start < minStorage - 0.001) {
       segment.comms = true;
@@ -1122,7 +1383,7 @@ function buildSections(
   }
 
   const freeCount = merged.filter((item) => !item.comms).length;
-  const fills = normalizeSinkStorage({ sinkStorage: storage }, freeCount);
+  const fills = normalizeSinkStorage({ sinkStorage: storage }, freeCount, rules);
   let freeIndex = 0;
   return merged.map((segment, index) => {
     const comms = segment.comms;
@@ -1168,17 +1429,18 @@ export function sinkLayout(
   >,
   gaps?: { left?: number; right?: number },
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): SinkLayout {
-  const width = snapSinkWidth(module.width);
-  const facades = sinkFacadeCount(module);
-  const gap = SINK_RULES.facadeGap;
-  const side = SINK_RULES.sidePanel;
-  const part = SINK_RULES.partition;
-  const geom = sinkGeometry(module, row);
+  const width = snapSinkWidth(module.width, rules);
+  const facades = sinkFacadeCount(module, rules);
+  const gap = rules.facadeGap;
+  const side = rules.sidePanel;
+  const part = rules.partition;
+  const geom = sinkGeometry(module, row, rules);
   const zoneLeftCm = geom.zoneLeft / 10;
   const zoneRightCm = geom.zoneRight / 10;
-  const gapLeft = gaps?.left ?? SINK_RULES.facadeEdgeGap;
-  const gapRight = gaps?.right ?? SINK_RULES.facadeEdgeGap;
+  const gapLeft = gaps?.left ?? rules.facadeEdgeGap;
+  const gapRight = gaps?.right ?? rules.facadeEdgeGap;
 
   const partitions: SinkPartitionBox[] = [];
   if (facades === 3) {
@@ -1212,7 +1474,8 @@ export function sinkLayout(
         width,
         geom,
         ideal,
-        preferredShiftSide(width, geom),
+        preferredShiftSide(width, geom, rules),
+        rules,
       );
       if (resolved) {
         partitions.push({
@@ -1238,6 +1501,7 @@ export function sinkLayout(
       zoneLeftCm,
       zoneRightCm,
       Array.isArray(module.sinkStorage) ? module.sinkStorage : [],
+      rules,
     );
     return {
       facades,
@@ -1253,6 +1517,7 @@ export function sinkLayout(
         applied.cuts,
         gapLeft,
         gapRight,
+        rules,
       ),
       sectionCuts: applied.cuts,
       bottleConflict: applied.conflict,
@@ -1263,8 +1528,8 @@ export function sinkLayout(
   // полками/ящиками (шов створок — на её осевой). Без наполнения
   // перегородок нет; сторона бутылочки не участвует — её граница (cut)
   // и есть перегородка для соседней секции коммуникаций.
-  for (const sideOfZone of autoPartitionSides(module, row)) {
-    const box = partitionBoxForSide(width, geom, sideOfZone);
+  for (const sideOfZone of autoPartitionSides(module, row, rules)) {
+    const box = partitionBoxForSide(width, geom, sideOfZone, rules);
     if (box) {
       partitions.push({
         ...box,
@@ -1312,6 +1577,7 @@ export function sinkLayout(
     zoneLeftCm,
     zoneRightCm,
     Array.isArray(module.sinkStorage) ? module.sinkStorage : [],
+    rules,
   );
 
   return {
@@ -1328,6 +1594,7 @@ export function sinkLayout(
       applied.cuts,
       gapLeft,
       gapRight,
+      rules,
     ),
     sectionCuts: applied.cuts,
     bottleConflict: applied.conflict,
@@ -1343,9 +1610,10 @@ export function sinkLayout(
 export function normalizeSinkModule(
   module: KitchenModule,
   row?: SinkRowContext,
+  rules: SinkRules = SINK_RULES,
 ): KitchenModule {
   if (module.type !== "sink") return module;
-  const geom = sinkGeometry(module, row);
+  const geom = sinkGeometry(module, row, rules);
   const patch: Partial<KitchenModule> = {};
   if (module.sinkWidth !== undefined && module.sinkWidth !== geom.width) {
     patch.sinkWidth = geom.width;
@@ -1364,8 +1632,8 @@ export function normalizeSinkModule(
     const nearest = nearestStandardSink(
       requestedW,
       requestedD,
-      maxSinkWidthFor(module.width, row),
-      maxSinkDepthFor(module.depth),
+      maxSinkWidthFor(module.width, row, rules),
+      maxSinkDepthFor(module.depth, rules),
     );
     if (nearest) {
       patch.sinkWidth = nearest.width;
@@ -1374,7 +1642,7 @@ export function normalizeSinkModule(
   }
   if (module.sinkOffset !== undefined && geom.position !== "center") {
     const snapped = clamp(
-      snapMm(module.sinkOffset),
+      snapMm(module.sinkOffset, rules),
       geom.minOffset,
       geom.maxOffset,
     );
@@ -1390,11 +1658,11 @@ export function normalizeSinkModule(
   // некуда, обнуляем. Бутылочница от перегородки не зависит (её граница —
   // собственный cut) и сохраняется; её конфликт показывает validation.
   const fillBlocked =
-    sinkPartitionConflicts(merged, row) ||
-    sinkLayout(merged, undefined, row).partitions.some(
+    sinkPartitionConflicts(merged, row, rules) ||
+    sinkLayout(merged, undefined, row, rules).partitions.some(
       (partition) => partition.structural && partition.conflict,
     );
-  const layout = sinkLayout(merged, undefined, row);
+  const layout = sinkLayout(merged, undefined, row, rules);
   const freeSections = layout.sections.filter((section) => !section.comms);
   const free = freeSections.length;
   // Бутылочница допустима только у бокового края корпуса (секция примыкает
@@ -1425,8 +1693,9 @@ export function normalizeSinkModule(
           })),
         },
         free,
+        rules,
       )
-    : normalizeSinkStorage({ sinkStorage: aligned }, free);
+    : normalizeSinkStorage({ sinkStorage: aligned }, free, rules);
   const changed =
     !Array.isArray(merged.sinkStorage) ||
     merged.sinkStorage.length !== storage.length ||

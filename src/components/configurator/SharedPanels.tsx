@@ -6,6 +6,8 @@ import {
   FACADE_MATERIALS,
   FACADE_STYLES,
   HANDLES,
+  facadeThicknesses,
+  findFacadeMaterial,
   snapCountertopThickness,
 } from "@/content/catalog";
 import {
@@ -20,8 +22,10 @@ import {
 import { PLINTH_MATERIALS, findPlinthMaterial, plinthRatePerMeter } from "@/content/plinth";
 import { PLINTH_MOUNTS, findSupportSystem } from "@/content/supports";
 import { computeLighting } from "@/lib/configurator/lighting";
-import { formatRub, kitchenFloorModules } from "@/lib/configurator/pricing";
+import { formatRub, kitchenFloorModules, kitchenUpperModules } from "@/lib/configurator/display";
 import { computeSupports } from "@/lib/configurator/supports";
+import { withKitchenFacadeThickness } from "@/lib/configurator/defaults";
+import { isLegacyFacadeMaterial } from "@/lib/configurator/materials";
 import type {
   FurnitureConfig,
   HandleType,
@@ -91,36 +95,32 @@ export function MaterialsPanel({
   config: FurnitureConfig;
   onChange: (next: FurnitureConfig) => void;
 }) {
-  const body = BODY_MATERIALS.find((item) => item.id === config.bodyMaterial) ?? BODY_MATERIALS[0];
+  const body = BODY_MATERIALS[0];
   const facade =
-    FACADE_MATERIALS.find((item) => item.id === config.facadeMaterial) ?? FACADE_MATERIALS[0];
+    findFacadeMaterial(config.facadeMaterial) ?? FACADE_MATERIALS[0];
+  const facadeThicknessOptions =
+    config.kind === "kitchen" ? facadeThicknesses(config.facadeMaterial) : [];
+  const bodyFinish = body.finishes.some((item) => item.id === config.bodyFinish)
+    ? config.bodyFinish
+    : body.finishes[0].id;
 
   return (
     <div className="space-y-5">
-      <PanelSection title="Корпус" hint="Материал влияет на прочность, вес и стоимость основы.">
-        <div className="grid grid-cols-3 gap-1.5">
-          {BODY_MATERIALS.map((material) => (
-            <ChoiceCard
-              key={material.id}
-              title={material.name}
-              meta={material.ratePerSqm ? `${formatRub(material.ratePerSqm)}/м²` : undefined}
-              selected={config.bodyMaterial === material.id}
-              onClick={() =>
-                onChange({
-                  ...config,
-                  bodyMaterial: material.id,
-                  bodyFinish: material.finishes[0].id,
-                })
-              }
-            />
-          ))}
+      <PanelSection
+        title="Корпус"
+        hint="Материал корпуса фиксирован: ЛДСП 16 мм. Доступен только выбор декора."
+      >
+        <div className="rounded-xl border border-ink/10 bg-white/40 px-3 py-2.5">
+          <div className="text-[0.7rem] font-semibold text-ink">ЛДСП 16 мм</div>
+          <p className="mt-1 text-[0.62rem] leading-relaxed text-ink/42">
+            {body.description}
+          </p>
         </div>
-        <p className="mt-2 text-[0.62rem] leading-relaxed text-ink/42">{body.description}</p>
         <div className="mt-3">
           <SwatchField
             label="Цвет корпуса"
             finishes={body.finishes}
-            value={config.bodyFinish}
+            value={bodyFinish}
             onChange={(id) => onChange({ ...config, bodyFinish: id })}
           />
         </div>
@@ -128,28 +128,49 @@ export function MaterialsPanel({
 
       <PanelSection title="Фасады" hint="Материал, покрытие и геометрия фронта.">
         <div className="grid grid-cols-2 gap-1.5">
-          {FACADE_MATERIALS.map((material) => (
+          {FACADE_MATERIALS.filter(
+            (material) =>
+              config.kind !== "wardrobe" ||
+              material.id === "ldsp" ||
+              material.id === "mdf_pvc",
+          ).map((material) => (
             <ChoiceCard
               key={material.id}
               title={material.name}
               meta={material.ratePerSqm ? `${formatRub(material.ratePerSqm)}/м²` : undefined}
               selected={config.facadeMaterial === material.id}
               onClick={() => {
-                const style =
-                  material.id === "glass" && config.facadeStyle === "shaker"
-                    ? "flat"
-                    : config.facadeStyle;
-                onChange({
+                if (config.kind === "wardrobe") {
+                  if (material.id !== "ldsp" && material.id !== "mdf_pvc") return;
+                  onChange({
+                    ...config,
+                    facadeMaterial: material.id,
+                    facadeThickness:
+                      material.id === "ldsp"
+                        ? 16
+                        : config.facadeThickness === 16
+                          ? 19
+                          : config.facadeThickness,
+                    facadeFinish: material.finishes[0].id,
+                  });
+                  return;
+                }
+                const next = {
                   ...config,
                   facadeMaterial: material.id,
                   facadeFinish: material.finishes[0].id,
-                  facadeStyle: style,
-                });
+                };
+                onChange(withKitchenFacadeThickness(next, next.facadeThickness));
               }}
             />
           ))}
         </div>
         <p className="mt-2 text-[0.62rem] leading-relaxed text-ink/42">{facade.description}</p>
+        {isLegacyFacadeMaterial(config.facadeMaterial) && (
+          <p className="mt-2 text-[0.6rem] leading-relaxed text-copper">
+            Исторический материал. Для нового сохранения выберите ЛДСП или МДФ.
+          </p>
+        )}
         <div className="mt-3">
           <SwatchField
             label="Покрытие фасада"
@@ -158,6 +179,37 @@ export function MaterialsPanel({
             onChange={(id) => onChange({ ...config, facadeFinish: id })}
           />
         </div>
+
+        {config.kind === "kitchen" && (
+          <div className="mt-4">
+            {facadeThicknessOptions.length > 0 ? (
+              <>
+                <ChipGroup
+                  title="Толщина фасада, мм"
+                  items={facadeThicknessOptions.map((value) => ({
+                    id: value,
+                    label: String(value),
+                  }))}
+                  value={config.facadeThickness}
+                  onPick={(id) =>
+                    onChange(
+                      withKitchenFacadeThickness(config, Number(id)),
+                    )
+                  }
+                />
+                <p className="mt-2 text-[0.6rem] leading-relaxed text-ink/42">
+                  Глубина корпуса = 580 − 3 (ХДФ) − толщина фасада. При смене
+                  толщины глубина нижнего ряда уменьшается до допустимой.
+                </p>
+              </>
+            ) : (
+              <p className="text-[0.6rem] leading-relaxed text-copper">
+                Для этого материала толщина фасада пока не утверждена; расчёт
+                использует {config.facadeThickness} мм.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="text-[0.66rem] font-medium text-ink/50">Геометрия фасада</div>
@@ -169,7 +221,6 @@ export function MaterialsPanel({
                 description={style.description}
                 meta={style.multiplier > 1 ? `×${style.multiplier}` : undefined}
                 selected={config.facadeStyle === style.id}
-                disabled={style.id === "shaker" && config.facadeMaterial === "glass"}
                 onClick={() => {
                   const handle: HandleType =
                     style.id === "handleless" &&
@@ -181,11 +232,6 @@ export function MaterialsPanel({
               />
             ))}
           </div>
-          {config.facadeMaterial === "glass" && (
-            <p className="mt-2 text-[0.6rem] leading-relaxed text-copper">
-              Для стекла в демо-конфигураторе доступны ровный и безручечный фасад.
-            </p>
-          )}
         </div>
       </PanelSection>
     </div>
@@ -298,6 +344,11 @@ export function KitchenOptionsPanel({
   const supports = computeSupports(config);
   const supportSystem = findSupportSystem(supports.systemId);
   const lighting = computeLighting(config);
+  // R1 (DOMAIN_CONFIRMED): подсветка доступна только при наличии верхних
+  // модулей; без них переключатель заблокирован и показана подсказка.
+  const upperModuleCount = kitchenUpperModules(config).length;
+  const lightingAvailable = upperModuleCount > 0;
+  const lightingOn = lightingAvailable && config.underCabinetLighting;
 
   return (
     <div className="space-y-5">
@@ -468,14 +519,17 @@ export function KitchenOptionsPanel({
           <SwitchRow
             title="Подсветка верхнего ряда"
             description={
-              config.underCabinetLighting
-                ? `Включено · ${lighting.lengthM} м · ${lighting.powerW} Вт`
-                : "Светодиодная лента под верхними шкафами."
+              !lightingAvailable
+                ? "Чтобы включить подсветку, добавьте верхние модули."
+                : lightingOn
+                  ? `Включено · ${lighting.lengthM} м · ${lighting.powerW} Вт`
+                  : "Светодиодная лента под верхними шкафами."
             }
-            checked={config.underCabinetLighting}
+            checked={lightingOn}
+            disabled={!lightingAvailable}
             onChange={(checked) => onChange({ ...config, underCabinetLighting: checked })}
           />
-          {config.underCabinetLighting && (
+          {lightingOn && (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -509,7 +563,7 @@ export function KitchenOptionsPanel({
           )}
         </div>
 
-        {config.underCabinetLighting && (
+        {lightingOn && (
           <div className="mt-3 space-y-3">
             <ChipGroup
               title="Напряжение"

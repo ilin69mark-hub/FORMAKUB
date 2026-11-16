@@ -2,7 +2,15 @@ import {
   KITCHEN_LIMITS,
   KITCHEN_MODULES,
   WARDROBE_LIMITS,
+  facadeThicknesses,
 } from "@/content/catalog";
+import {
+  KITCHEN_MAX_FULL_DEPTH_MM,
+  kitchenMaxBodyDepthCm,
+} from "./geometry";
+import { isLegacyFacadeMaterial } from "./materials";
+import { wardrobeGeometry, wardrobeMinWidthMm } from "./wardrobe-geometry";
+import { wardrobeHingePlan } from "./wardrobe-hinges";
 import { kitchenTotalWidth, kitchenFloorModules, kitchenUpperModules } from "./pricing";
 import {
   SINK_RULES,
@@ -63,6 +71,22 @@ export function validateKitchen(config: KitchenConfig): ValidationIssue[] {
     );
   }
 
+  if (!Number.isFinite(config.facadeThickness)) {
+    issues.push(error("facadeThickness", "Толщина фасада должна быть числом, мм."));
+  }
+  const allowedFacadeThicknesses = facadeThicknesses(config.facadeMaterial);
+  if (
+    allowedFacadeThicknesses.length > 0 &&
+    !allowedFacadeThicknesses.includes(config.facadeThickness)
+  ) {
+    issues.push(
+      error(
+        "facadeThickness",
+        `Толщина фасада «${config.facadeMaterial}»: ${allowedFacadeThicknesses.join(", ")} мм.`,
+      ),
+    );
+  }
+
   const ids = new Set<string>();
   for (const unit of modules) {
     if (ids.has(unit.id)) {
@@ -110,6 +134,16 @@ export function validateKitchen(config: KitchenConfig): ValidationIssue[] {
           `Глубина модуля «${preset.label}»: от ${preset.minDepth} до ${preset.maxDepth} см.`,
         ),
       );
+    } else if (unit.type !== "tall" && unit.type !== "oven") {
+      const maxBodyDepth = kitchenMaxBodyDepthCm(config.facadeThickness);
+      if (unit.depth > maxBodyDepth) {
+        issues.push(
+          error(
+            `modules.${unit.id}.depth`,
+            `Глубина корпуса «${preset.label}» не более ${maxBodyDepth.toFixed(1)} см при фасаде ${config.facadeThickness} мм: корпус + ХДФ 3 мм + фасад ≤ ${KITCHEN_MAX_FULL_DEPTH_MM / 10} см.`,
+          ),
+        );
+      }
     }
     if (
       !Number.isInteger(unit.shelves) ||
@@ -499,24 +533,30 @@ export function validateWardrobe(config: WardrobeConfig): ValidationIssue[] {
       ),
     );
   }
-  if (
-    !isFiniteNumber(config.depth) ||
-    config.depth < WARDROBE_LIMITS.minDepth ||
-    config.depth > WARDROBE_LIMITS.maxDepth
-  ) {
+  if (!isFiniteNumber(config.fullDepth) || config.fullDepth <= 0) {
+    issues.push(
+      error("fullDepth", "Полная глубина шкафа должна быть положительным числом, мм."),
+    );
+  } else if (config.fullDepth <= config.facadeThickness + config.backPanelThicknessMm) {
     issues.push(
       error(
-        "depth",
-        `Глубина шкафа: от ${WARDROBE_LIMITS.minDepth} до ${WARDROBE_LIMITS.maxDepth} см.`,
+        "fullDepth",
+        "Полная глубина должна быть больше толщины фасада и задней стенки.",
       ),
     );
   }
 
-  const width = sections.reduce(
-    (sum, section) => sum + (isFiniteNumber(section.width) ? section.width : 0),
-    0,
-  );
-  if (width < WARDROBE_LIMITS.minTotalWidth) {
+  const geometry = wardrobeGeometry(config);
+  const width = geometry.widthMm / 10;
+  const minWidthMm = wardrobeMinWidthMm(sections.length);
+  if (config.widthMm < minWidthMm) {
+    issues.push(
+      error(
+        "widthMm",
+        `Минимальная ширина для ${sections.length} секц. — ${minWidthMm} мм.`,
+      ),
+    );
+  } else if (width < WARDROBE_LIMITS.minTotalWidth) {
     issues.push(
       error(
         "width",
@@ -540,19 +580,21 @@ export function validateWardrobe(config: WardrobeConfig): ValidationIssue[] {
     }
     ids.add(section.id);
 
-    if (
-      !isFiniteNumber(section.width) ||
-      section.width < WARDROBE_LIMITS.minSectionWidth ||
-      section.width > WARDROBE_LIMITS.maxSectionWidth
+    const geometrySection = geometry.sections.find((item) => item.id === section.id);
+    if (!geometrySection) {
+      issues.push(error(`sections.${section.id}`, "Секция не соответствует геометрии корпуса."));
+    } else if (
+      geometrySection.innerWidthMm < 300 ||
+      geometrySection.widthMm > WARDROBE_LIMITS.maxSectionWidth * 10
     ) {
       issues.push(
         error(
           `sections.${section.id}.width`,
-          `Ширина секции: от ${WARDROBE_LIMITS.minSectionWidth} до ${WARDROBE_LIMITS.maxSectionWidth} см.`,
+          "Ширина секции должна быть не менее 300 мм и не больше допустимой.",
         ),
       );
     }
-    if (section.drawers > 0 && section.width < 50) {
+    if (section.drawers > 0 && geometrySection && geometrySection.widthMm < 500) {
       issues.push(
         error(
           `sections.${section.id}.drawers`,
@@ -654,6 +696,148 @@ export function validateWardrobe(config: WardrobeConfig): ValidationIssue[] {
     }
   }
 
+  // Этап 1: ограничения новой модели данных шкафа.
+  if (config.bodyMaterial !== "ldsp") {
+    issues.push(error("bodyMaterial", "Корпус шкафа допускается только из ЛДСП."));
+  }
+  if (config.bodyThicknessMm !== 16) {
+    issues.push(error("bodyThicknessMm", "Толщина корпуса должна быть 16 мм."));
+  }
+  if (config.backPanelThicknessMm !== 3) {
+    issues.push(error("backPanelThicknessMm", "Задняя стенка должна быть ХДФ 3 мм."));
+  }
+  if (config.plinthHeightMm !== 80 || config.plinthInsetMm !== 50) {
+    issues.push(error("plinth", "Цоколь: высота 80 мм, утопление 50 мм."));
+  }
+  if (config.facadeMount !== "overlay") {
+    issues.push(error("facadeMount", "Основное исполнение фасадов — накладное."));
+  }
+  const facadeThicknessValid =
+    config.facadeMaterial === "ldsp"
+      ? config.facadeThickness === 16
+      : config.facadeThickness === 19 || config.facadeThickness === 22;
+  if (!facadeThicknessValid) {
+    issues.push(
+      error(
+        "facadeThickness",
+        "Толщина фасада не соответствует материалу: ЛДСП — 16 мм, МДФ ПВХ — 19 или 22 мм.",
+      ),
+    );
+  }
+
+  if (config.antresol) {
+    if (
+      !isFiniteNumber(config.antresol.heightMm) ||
+      config.antresol.heightMm <= 0 ||
+      config.antresol.heightMm +
+        2 * config.bodyThicknessMm +
+        config.plinthHeightMm >=
+        config.height * 10
+    ) {
+      issues.push(
+        error(
+          "antresol.heightMm",
+          "Высота антресоли должна быть больше 0 и меньше общей высоты шкафа.",
+        ),
+      );
+    }
+  }
+
+  const expectedSections = config.partition ? 2 : 1;
+  if (sections.length !== expectedSections) {
+    issues.push(
+      error(
+        "sections",
+        config.partition
+          ? "При центральной перегородке должно быть две секции."
+          : "Без центральной перегородки должна быть одна секция.",
+      ),
+    );
+  }
+  if (config.partition) {
+    const position = config.partition.positionMm;
+    if (
+      !isFiniteNumber(position) ||
+      geometry.sections.some((section) => section.innerWidthMm < 300)
+    ) {
+      issues.push(
+        error(
+          "partition.positionMm",
+          "Перегородка должна оставлять секции шириной не менее 300 мм.",
+        ),
+      );
+    }
+  }
+
+  for (const section of sections) {
+    if (section.drawerBlock) {
+      if (section.drawers < 3 || section.drawers > 5) {
+        issues.push(
+          error(
+            `sections.${section.id}.drawers`,
+            "Блок ящиков должен содержать от 3 до 5 ящиков.",
+          ),
+        );
+      }
+      if (section.drawerBlock.frontHeightsMm.length !== section.drawers) {
+        issues.push(
+          error(
+            `sections.${section.id}.drawerBlock.frontHeightsMm`,
+            "Количество высот фасадов должно совпадать с количеством ящиков секции.",
+          ),
+        );
+      }
+      const startMm =
+        config.plinthHeightMm + config.bodyThicknessMm + 20;
+      const topLimitMm = geometry.antresol
+        ? config.plinthHeightMm +
+          config.bodyThicknessMm +
+          geometry.antresol.mainHeightMm
+        : config.height * 10 - config.bodyThicknessMm;
+      const frontsMm =
+        section.drawerBlock.frontHeightsMm.reduce((sum, value) => sum + value, 0) +
+        2 * Math.max(0, section.drawers - 1);
+      if (
+        section.drawerBlock.topMm <= startMm ||
+        section.drawerBlock.topMm > topLimitMm ||
+        frontsMm > section.drawerBlock.topMm - startMm
+      ) {
+        issues.push(
+          error(
+            `sections.${section.id}.drawerBlock`,
+            "Блок ящиков не помещается в доступную высоту секции.",
+          ),
+        );
+      }
+    }
+    if (section.rodType === "pullout") {
+      if (!section.pulloutRod) {
+        issues.push(
+          error(
+            `sections.${section.id}.pulloutRod`,
+            "Для выдвижной штанги укажите длину и исполнение.",
+          ),
+        );
+      } else if (config.fullDepth < 250 || config.fullDepth > 450) {
+        issues.push(
+          error(
+            `sections.${section.id}.pulloutRod`,
+            "Выдвижная штанга допустима при глубине секции 250–450 мм.",
+          ),
+        );
+      }
+    }
+  }
+
+  const hingePlan = wardrobeHingePlan(config);
+  if (hingePlan.overloaded) {
+    issues.push(
+      warning(
+        "facadeHinges",
+        `Масса двери превышает подтверждённый диапазон петель (${hingePlan.reason}). Требуется проверка модели петель.`,
+      ),
+    );
+  }
   issues.push(...validateCompatibility(config));
   return issues;
 }
@@ -680,11 +864,11 @@ function validateCompatibility(config: KitchenConfig | WardrobeConfig): Validati
       ),
     );
   }
-  if (config.facadeMaterial === "glass" && config.facadeStyle === "shaker") {
+  if (isLegacyFacadeMaterial(config.facadeMaterial)) {
     issues.push(
-      error(
-        "facadeStyle",
-        "Стеклянный фасад в демо-конфигураторе доступен в ровном или безручечном исполнении.",
+      warning(
+        "facadeMaterial",
+        "Исторический материал фасада: для новых конфигураций недоступен. Выберите ЛДСП или МДФ.",
       ),
     );
   }
@@ -710,13 +894,15 @@ function getFittingsWidths(config: KitchenConfig | WardrobeConfig): { ok: boolea
       ),
     };
   }
+  const geometry = wardrobeGeometry(config);
   return {
-    ok: config.sections.every(
-      (section) =>
-        Number.isFinite(section.width) &&
-        section.shelves.every((value) => Number.isFinite(value)) &&
-        section.rods.every((value) => Number.isFinite(value)),
-    ),
+    ok:
+      Number.isFinite(geometry.widthMm) &&
+      config.sections.every(
+        (section) =>
+          section.shelves.every((value) => Number.isFinite(value)) &&
+          section.rods.every((value) => Number.isFinite(value)),
+      ),
   };
 }
 

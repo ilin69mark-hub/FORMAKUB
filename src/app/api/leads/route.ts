@@ -79,6 +79,9 @@ export async function POST(request: Request) {
       customer: parsed.data.customer,
       source: parsed.data.source,
       interest: parsed.data.interest,
+      ...(parsed.data.projectId === undefined
+        ? {}
+        : { projectId: parsed.data.projectId }),
     });
 
     if (!created.ok) {

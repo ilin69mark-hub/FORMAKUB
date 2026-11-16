@@ -54,6 +54,10 @@ export const PRICING = {
     hingePerDoor: 390,
     softClosePerDoor: 460,
     pushToOpenPerDoor: 1350,
+    // Этап 7: тестовые тарифы кромки, ₽/пог. м.
+    edgePvc04: 5,
+    edgePvc1: 15,
+    edgePvc2: 30,
   },
 } as const;
 

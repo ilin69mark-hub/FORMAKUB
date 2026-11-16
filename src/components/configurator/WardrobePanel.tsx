@@ -1,15 +1,11 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { WARDROBE_LIMITS } from "@/content/catalog";
-import { createId } from "@/lib/configurator/defaults";
-import { wardrobeWidth } from "@/lib/configurator/pricing";
+import { wardrobeWidth } from "@/lib/configurator/display";
+import { wardrobeGeometry } from "@/lib/configurator/wardrobe-geometry";
 import type { WardrobeConfig, WardrobeSection } from "@/lib/configurator/types";
-import {
-  MiniButton,
-  PanelSection,
-  RangeField,
-} from "./ui";
+import { PanelSection, RangeField } from "./ui";
 
 function normalizeSection(
   section: WardrobeSection,
@@ -102,6 +98,7 @@ export function WardrobePanel({
 }) {
   const selected =
     config.sections.find((section) => section.id === selectedId) ?? config.sections[0];
+  const geometry = wardrobeGeometry(config);
   const totalWidth = Math.round(wardrobeWidth(config));
   const sectionIndex = selected
     ? config.sections.findIndex((section) => section.id === selected.id)
@@ -128,43 +125,7 @@ export function WardrobePanel({
     });
   };
 
-  const addSection = () => {
-    if (config.sections.length >= WARDROBE_LIMITS.maxSections) return;
-    if (totalWidth + 60 > WARDROBE_LIMITS.maxTotalWidth) return;
-    const section: WardrobeSection = {
-      id: createId("s"),
-      width: 60,
-      shelves: [],
-      rods: [],
-      drawers: 0,
-    };
-    onChange({ ...config, sections: [...config.sections, section] });
-    onSelect(section.id);
-  };
-
-  const removeSelected = () => {
-    if (!selected || config.sections.length <= WARDROBE_LIMITS.minSections) return;
-    const remaining = config.sections.filter((section) => section.id !== selected.id);
-    const next =
-      remaining[Math.max(0, sectionIndex - 1)] ?? remaining[0];
-    onChange({ ...config, sections: remaining });
-    if (next) onSelect(next.id);
-  };
-
-  const moveSelected = (direction: -1 | 1) => {
-    if (!selected) return;
-    const target = sectionIndex + direction;
-    if (target < 0 || target >= config.sections.length) return;
-    const sections = [...config.sections];
-    [sections[sectionIndex], sections[target]] = [sections[target], sections[sectionIndex]];
-    onChange({ ...config, sections });
-  };
-
   if (view === "sections") {
-    const widthMax =
-      WARDROBE_LIMITS.maxTotalWidth -
-      (totalWidth - (selected?.width ?? 0));
-
     return (
       <div className="space-y-5">
         <PanelSection title="Габариты шкафа" hint="Высота и глубина общие для всех секций.">
@@ -179,13 +140,37 @@ export function WardrobePanel({
               onChange={setHeight}
             />
             <RangeField
-              label="Глубина"
-              value={config.depth}
+              label="Общая ширина"
+              value={config.widthMm}
+              min={WARDROBE_LIMITS.minTotalWidth * 10}
+              max={WARDROBE_LIMITS.maxTotalWidth * 10}
+              step={10}
+              unit="мм"
+              markStep={100}
+              onChange={(value) => onChange({ ...config, widthMm: value })}
+            />
+            {config.partition && (
+              <RangeField
+                label="Положение перегородки"
+                value={config.partition.positionMm}
+                min={300 + config.bodyThicknessMm + 8}
+                max={config.widthMm - 300 - config.bodyThicknessMm - 8}
+                step={1}
+                unit="мм"
+                markStep={100}
+                onChange={(value) =>
+                  onChange({ ...config, partition: { positionMm: value } })
+                }
+              />
+            )}
+            <RangeField
+              label="Полная глубина"
+              value={config.fullDepth / 10}
               min={WARDROBE_LIMITS.minDepth}
               max={WARDROBE_LIMITS.maxDepth}
               step={1}
               markStep={5}
-              onChange={(value) => onChange({ ...config, depth: value })}
+              onChange={(value) => onChange({ ...config, fullDepth: value * 10 })}
             />
           </div>
           <div className="mt-3 flex items-center justify-between rounded-lg bg-ink/[0.035] px-3 py-2 text-[0.62rem]">
@@ -214,7 +199,7 @@ export function WardrobePanel({
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[0.66rem] font-semibold">
-                  {section.width} см
+                  {Math.round((geometry.sections[index]?.innerWidthMm ?? 0) / 10)} см
                 </span>
                 <span className="text-[0.55rem] text-ink/35">
                   {section.shelves.length}п
@@ -223,67 +208,18 @@ export function WardrobePanel({
             ))}
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={addSection}
-              disabled={
-                config.sections.length >= WARDROBE_LIMITS.maxSections ||
-                totalWidth + 60 > WARDROBE_LIMITS.maxTotalWidth
-              }
-              className="flex items-center gap-1.5 text-[0.64rem] font-semibold text-copper disabled:opacity-40"
-            >
-              <Plus size={12} />
-              Добавить секцию
-            </button>
-            <span className="text-[0.58rem] text-ink/35">
-              {config.sections.length} / {WARDROBE_LIMITS.maxSections}
-            </span>
-          </div>
+          <p className="mt-3 text-[0.58rem] text-ink/35">
+            Ширины секций рассчитываются по положению перегородки.
+          </p>
         </PanelSection>
 
         {selected && (
-          <PanelSection title={`Секция ${sectionIndex + 1}`} hint="Ширина меняется в пределах лимита общей длины.">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1">
-                <MiniButton
-                  title="Переместить секцию влево"
-                  onClick={() => moveSelected(-1)}
-                  disabled={sectionIndex <= 0}
-                >
-                  <ChevronLeft size={14} />
-                </MiniButton>
-                <MiniButton
-                  title="Переместить секцию вправо"
-                  onClick={() => moveSelected(1)}
-                  disabled={sectionIndex >= config.sections.length - 1}
-                >
-                  <ChevronRight size={14} />
-                </MiniButton>
-              </div>
-              <MiniButton
-                title="Удалить секцию"
-                onClick={removeSelected}
-                disabled={config.sections.length <= WARDROBE_LIMITS.minSections}
-              >
-                <Trash2 size={13} />
-              </MiniButton>
-            </div>
-            <RangeField
-              label="Ширина секции"
-              value={selected.width}
-              min={WARDROBE_LIMITS.minSectionWidth}
-              max={Math.max(
-                WARDROBE_LIMITS.minSectionWidth,
-                Math.min(WARDROBE_LIMITS.maxSectionWidth, widthMax),
-              )}
-              step={1}
-              markStep={5}
-              onChange={(value) => updateSection(selected.id, { width: value })}
-            />
+          <PanelSection title={`Секция ${sectionIndex + 1}`} hint="Ширина рассчитывается автоматически.">
+            <p className="text-[0.68rem] font-medium text-ink/60">
+              Ширина: {Math.round((geometry.sections[sectionIndex]?.innerWidthMm ?? 0) / 10)} см
+            </p>
             <p className="mt-2 text-[0.6rem] leading-relaxed text-ink/38">
-              Для ящиков нужна ширина не меньше 50 см. При уменьшении секции
-              ящики и полки автоматически проверяются.
+              Для ящиков нужна внутренняя ширина не меньше 50 см.
             </p>
           </PanelSection>
         )}
@@ -328,10 +264,7 @@ export function WardrobePanel({
               step={1}
               unit="шт."
               onChange={(value) =>
-                updateSection(selected.id, {
-                  drawers: value,
-                  ...(value > 0 && selected.width < 50 ? { width: 50 } : {}),
-                })
+                updateSection(selected.id, { drawers: value })
               }
             />
             <p className="mt-1.5 text-[0.6rem] leading-relaxed text-ink/38">

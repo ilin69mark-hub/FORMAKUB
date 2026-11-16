@@ -30,7 +30,7 @@ describe("kitchen validation", () => {
   it("rejects mismatched heights in the base row", () => {
     const config = defaultKitchen();
     const modules = config.modules.map((module) =>
-      module.type === "sink" ? { ...module, height: 85 } : module,
+      module.type === "sink" ? { ...module, height: 70 } : module,
     );
     const issues = validateKitchen({ ...config, modules });
 
@@ -65,14 +65,19 @@ describe("kitchen validation", () => {
     expect(issues.some((issue) => issue.path === "handle")).toBe(true);
   });
 
-  it("rejects a shaker glass facade", () => {
+  it("marks a historical glass facade as unavailable for new configurations", () => {
     const issues = validateKitchen({
       ...defaultKitchen(),
       facadeMaterial: "glass",
       facadeStyle: "shaker",
     });
 
-    expect(issues.some((issue) => issue.path === "facadeStyle")).toBe(true);
+    expect(
+      issues.some(
+        (issue) =>
+          issue.path === "facadeMaterial" && issue.severity === "warning",
+      ),
+    ).toBe(true);
   });
 
   it("allows a kitchen wider than the old 480 cm demo limit", () => {
@@ -128,9 +133,14 @@ describe("wardrobe validation", () => {
   it("rejects drawers in a section narrower than 50 cm", () => {
     const config = defaultWardrobe();
     const sections = config.sections.map((section, index) =>
-      index === 0 ? { ...section, width: 40, drawers: 2 } : section,
+      index === 0 ? { ...section, drawers: 2 } : section,
     );
-    const issues = validateWardrobe({ ...config, sections });
+    const issues = validateWardrobe({
+      ...config,
+      widthMm: 1000,
+      partition: { positionMm: 500 },
+      sections,
+    });
 
     expect(issues.some((issue) => issue.message.includes("не меньше 50 см"))).toBe(true);
   });
@@ -147,16 +157,9 @@ describe("wardrobe validation", () => {
 
   it("rejects a total width above the demo limit", () => {
     const config = defaultWardrobe();
-    const sections = Array.from({ length: 5 }, (_, index) => ({
-      id: `s-${index}`,
-      width: 100,
-      shelves: [],
-      rods: [],
-      drawers: 0,
-    }));
-    const issues = validateWardrobe({ ...config, sections });
+    const issues = validateWardrobe({ ...config, widthMm: 5000 });
 
-    expect(issues.some((issue) => issue.message.includes("ширина шкафа"))).toBe(true);
+    expect(issues.some((issue) => issue.message.includes("ширина"))).toBe(true);
   });
 });
 

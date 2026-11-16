@@ -4,6 +4,7 @@ import "./globals.css";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { MotionEffects } from "@/components/site/MotionEffects";
+import { SiteChrome } from "@/components/site/SiteChrome";
 import { SITE } from "@/content/site";
 
 const manrope = Manrope({
@@ -124,9 +125,9 @@ export default function RootLayout({
           Перейти к содержимому
         </a>
         <MotionEffects />
-        <Header />
-        <main id="main">{children}</main>
-        <Footer />
+        <SiteChrome header={<Header />} footer={<Footer />}>
+          <main id="main">{children}</main>
+        </SiteChrome>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}

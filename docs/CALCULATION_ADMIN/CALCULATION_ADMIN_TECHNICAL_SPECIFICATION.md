@@ -186,11 +186,11 @@ flowchart TB
 | Поле | Содержание |
 |---|---|
 | Назначение | Управление общими справочниками. |
-| Функциональность | `BODY_MATERIALS` (3 материала, ставки 5200/7600/9200 ₽/м², 11 декоров), `FACADE_MATERIALS` (5 материалов, 5600–18600 ₽/м², 17 декоров), `FACADE_STYLES` (3 стиля, множители 1.0/1.16/1.08), `COUNTERTOPS` (6 вариантов, 9500–29400 ₽/м), `PLINTH_MATERIALS` (5 материалов, 1600–6200 ₽/м + 10 исполнений с `rateDelta`), `PLINTH_MOUNTS` (2 варианта). |
+| Функциональность | `BODY_MATERIALS` (1 фиксированный материал — ЛДСП 16 мм, 5200 ₽/м²), `FACADE_MATERIALS` (3 действующих материала: ЛДСП 5600, МДФ эмаль 8400, МДФ ПВХ 8400 ₽/м²; палитра МДФ эмаль/ПВХ — единый `MDF_FACADE_FINISHES`, CA-516-01; шпон/стекло/массив — только legacy), `FACADE_STYLES` (3 стиля, множители 1.0/1.16/1.08), `COUNTERTOPS` (6 вариантов, 9500–29400 ₽/м), `PLINTH_MATERIALS` (5 материалов, 1600–6200 ₽/м + 10 исполнений с `rateDelta`), `PLINTH_MOUNTS` (2 варианта). |
 | Входные данные | `CatalogItem`. |
 | Выходные данные | Обновлённый справочник + `AdminAuditLog`. |
 | Операции администратора | Создание/редактирование/архивирование записей, управление декорами и толщинами. |
-| Ограничения | Идентификаторы (`id`) не переименовывать: на них ссылаются zod-enum и сохранённые проекты. **[АУДИТ]** Одинаковые ставки `ldsp_hpl`/`compact_hpl` (9500) и `porcelain`/`solid_wood` (29400) — требуют подтверждения перед публикацией. |
+| Ограничения | Идентификаторы (`id`) не переименовывать: на них ссылаются zod-enum и сохранённые проекты. **[АУДИТ]** Одинаковые ставки `ldsp_hpl`/`compact_hpl` (9500) и `porcelain`/`solid_wood` (29400) — требуют подтверждения перед публикацией. **CA-516:** палитра МДФ ПВХ использует единый источник с эмалью (не две копии); материалы/тарифы/PriceItem раздельны. Архивировать можно только записи без исторических зависимостей; legacy-записи с проектами, pins, `priceHistory`, `usage=used` или published snapshots остаются Legacy и не архивируются. Проект с `veneer`/`glass`/`solid` читается, но не пересчитывается (`LEGACY_FACADE_MATERIAL`, 422) до ручной замены фасада. Production DB без отдельного разрешения не изменяется. |
 | Зависимости | 06 (цены), 10 (валидация). |
 | Критерии готовности | Справочник редактируется без деплоя; сохранённые проекты валидны после изменений (см. раздел 04). |
 
@@ -242,7 +242,7 @@ flowchart TB
 | Входные данные | `PriceItem`, `PricingVersion`. |
 | Выходные данные | Опубликованная версия прайса + `PricingChange` + `AdminAuditLog`; запуск пересчёта (раздел 05 настоящего ТЗ). |
 | Операции администратора | Редактирование цен → валидация → создание версии → публикация (с подтверждением) → инициация пересчёта. |
-| Ограничения | **[АУДИТ]** Не отображать как действующие настройки 4 мёртвых поля: `PRICING.kitchen.plinthPerMeter`, `sinkPartition`, `underCabinetLightPerMeter`, `countertopDepthAllowance` — они не влияют на расчёт (**[ФАКТ]** подтверждено чтением `calculateKitchenPrice`). **[ФАКТ]** (CA-T-002/CA-T-007): эти 4 поля физически остаются в `src/content/pricing.ts:26, 27, 29, 33` и не читаются `calculateKitchenPrice`; `PRICING.wardrobe.plinthPerMeter` при этом используется (`src/lib/configurator/pricing.ts:492`); удаление полей относится к Q12 / Этапу 0 (поля из кода не удалялись, Q12 не закрыт). Публикация запрещена при ошибках валидации. |
+| Ограничения | **[АУДИТ]** Не отображать как действующие настройки 4 мёртвых поля: `PRICING.kitchen.plinthPerMeter`, `sinkPartition`, `underCabinetLightPerMeter`, `countertopDepthAllowance` — они не влияют на расчёт (**[ФАКТ]** подтверждено чтением `calculateKitchenPrice`). **[ФАКТ]** (CA-T-002/CA-T-007): эти 4 поля физически остаются в `src/content/pricing.ts:26, 27, 29, 33` и не читаются `calculateKitchenPrice`; `PRICING.wardrobe.plinthPerMeter` при этом используется (`src/lib/configurator/pricing.ts:492`); удаление полей относится к Q12 / Этапу 0 (поля из кода не удалялись, Q12 не закрыт). Публикация запрещена при ошибках валидации. **[РЕШЕНИЕ Q2, §12.5]** первичное создание `PriceItem` — только контролируемым импортом (R-14 сохраняется). |
 | Зависимости | 02–05 (источники ставок), 08 (пересчёт), 09 (версии). |
 | Критерии готовности | Публикация создаёт `PricingVersion`; изменение цены без деплоя отражается в `calculatePrice`; история изменений записана. |
 
@@ -336,7 +336,7 @@ flowchart TB
 | `catalog` | enum(`bodyMaterial`,`facadeMaterial`,`facadeStyle`,`handle`,`countertop`,`plinthMaterial`,`plinthFinish`,`plinthMount`,`supportSystem`,`ledStrip`,`ledProfile`,`ledDiffuser`,`ledControl`,`ledPsu`,`sinkSize`,`promo`) | да | Исходный справочник (**[ЦЕЛЕВОЕ ПОВЕДЕНИЕ]** CA-T-004: `psu` → `ledPsu` согласно дизайну §6.2). |
 | `label` | string | да | Отображаемое название. |
 | `attrs` | object | да | Справочные атрибуты (ставки, множители, толщины, `rateDelta`, `finishes`…). |
-| `status` | enum(`active`,`archived`,`preliminary`) | да | Статус. |
+| `status` | enum(`active`,`archived`,`preliminary`) | да | Статус. **[РЕШЕНИЕ Q3, §12.5]:** импорт создаёт новые записи в статусе `draft`; импорт не публикует автоматически; публикация — отдельная операция (CA-T-208 сохраняется). |
 | `sortOrder` | int | нет | Порядок в UI. |
 | `version` | string | да | Версия значения. |
 | `updatedAt` / `updatedBy` | timestamp / string | да | Метаданные. |
@@ -367,7 +367,7 @@ flowchart TB
 | `id` | string | да | Стабильный ключ ставки (напр. `kitchen.hingePerDoor`). |
 | `scope` | enum(`kitchen`,`wardrobe`,`shared`) | да | Область. |
 | `label` | string | да | Название. |
-| `unit` | enum(`RUB`,`RUB_PER_SQM`,`RUB_PER_M`,`RUB_PER_PCS`,`RUB_PER_LINM`,`FACTOR`) | да | Ед. изм. |
+| `unit` | enum(`RUB`,`RUB_PER_SQM`,`RUB_PER_M`,`RUB_PER_PCS`,`RUB_PER_LINM`,`FACTOR`) | да | Ед. изм. Набор не расширять до подтверждения конкретных потребностей (**[РЕШЕНИЕ Q7]**, §12.5). |
 | `usage` | enum(`used`,`unused`) | да | **[АУДИТ]** 4 поля имеют `unused` и не отображаются как настройки (требование 5.9). |
 | `sourceRef` | string | да | `src/content/pricing.ts:PRICING.kitchen.shelf` и т.п. |
 | `updatedAt` / `updatedBy` | — | да | Метаданные. |
@@ -740,6 +740,8 @@ sequenceDiagram
 | POST | `/api/admin/pricing-versions/:id/publish` | Публикация | — | 201 + запуск пересчёта | **422** (валидация), 409 |
 | GET | `/api/admin/pricing-versions/:id/changes` | Diff ставок | — | `PricingChange[]` | 404 |
 
+*Первичное создание `PriceItem` через API не предусмотрено: новые ставки вводятся только контролируемым импортом (**[РЕШЕНИЕ Q2]**, R-14; см. §12.5).*
+
 ### Просмотр алгоритмов
 
 | Метод | Путь | Назначение | Вход | Ответ | Ошибки |
@@ -846,6 +848,10 @@ Calculation Admin
 
 **Вывод: существующая «защита» для административных функций НЕ подходит и не может быть расширена — требуется отдельное решение (ADR, раздел 12).**
 
+**[ОБНОВЛЕНИЕ 2026-11-13]** — факты выше относятся к состоянию на дату подготовки ТЗ. Проверено позже: реализация CA-T-602/603 по коду отмечена **DONE** в плане (v0.77–v0.78, 2026-11-10): `src/proxy.ts` (deny-by-default для `/admin*` и `/api/admin/*`), `src/lib/auth/*` (OIDC+PKCE, server-side sessions, permissions), admin API под guard-ами, 30+ auth-тестов. **[ФАКТ]** deployment-предусловия ADR-02 (Keycloak provisioning, issuer, секреты, live login) остаются **OPEN** (план, v0.84: «Keycloak provisioning/live login — deployment-предусловие»).
+
+**[РЕШЕНИЕ Q6]** (2026-11-13, §12.5): Этап 1 целевой модели не расширяется механизмом авторизации; **CA-T-602 и CA-T-603 остаются блокирующими для безопасной публикации** — публикация в production не описывается как безопасная до выполнения этих блокеров (включая deployment-предусловия ADR-02). Статусы задач CA-T-602/603 настоящим документом не изменяются. Требования §8.2 сохраняются.
+
 ## 8.2. Требования
 
 | № | Требование | Статус |
@@ -941,6 +947,7 @@ flowchart LR
 | T-0.3 | ADR-03: persistence рантайма | Volume/бэкап для `data/*.json` (факт: volume нет). | — | Решение о volume/бэкапе | Решение реализовано инфраструктурно | — | `docker-compose.yml` |
 | T-0.4 | ADR-04: границы редактируемой геометрии | Какие параметры раздела 01 выносить сразу, какие — после устранения дублей (аудит 6.1–6.4, 6.9). | — | Реестр «выносить / не выносить» | Реестр утверждён | — | — |
 | T-0.5 | ADR-05: очередь пересчёта | In-process vs внешняя очередь (зависит от топологии инстансов). | T-0.1 | Выбор механизма очереди | ADR подписан | — | — |
+| T-0.6 | **Отдельный ADR: слой управляемых правил комплектации** (решение владельца Q1, §12.5) | Зафиксирована необходимость и зависимости ADR: данные vs код, связь с версионированием (`priceVersion`/`calcVersion`, раздел 04) и воспроизводимостью расчётов. Содержание ADR настоящим ТЗ не утверждается; без второго расчётного движка. | ADR-06 (контракт движка), раздел 04 | Утверждённый ADR | ADR подписан владельцем; не входит в Этап 1 целевой модели | — | — |
 
 ### Фаза 1. Модель данных и версии
 
@@ -1012,6 +1019,7 @@ flowchart LR
 | Задача | Зависит от | Блокирует |
 |---|---|---|
 | T-0.1…T-0.5 (ADR) | решение владельца | Фазы 1–4 |
+| T-0.6 (ADR правил комплектации, Q1) | ADR-06, раздел 04 | Этап «правила и параметры» целевой модели (§12.5-Q1) |
 | T-1.1 | T-0.1 | T-1.2…T-1.5 |
 | T-2.1…T-2.3 | T-1.2, T-1.4, T-0.4 | Фаза 5 |
 | T-2.4 | T-0.1 | T-3.1 |
@@ -1083,6 +1091,8 @@ flowchart TD
 1. Дублирование счётчика дверей: `doorCountForWidth` (`pricing.ts`) vs `doorCount` (`KitchenScene.tsx`), порог 60 см дважды.
 2. Зазоры фасадов продублированы: `facadeEdgeGap/facadeNeighborGap/facadeInnerGap` (`sink.ts`) vs `EDGE_GAP/NEIGHBOR_GAP/DOOR_GAP` (`KitchenScene.tsx`); третий зазор `facadeGap = 0.25`.
 3. Толщина 1.6 см продублирована литералом в `KitchenScene.tsx`; в `WardrobeScene.tsx` — `sectionWidth − 2.8` при `WARDROBE_LIMITS.carcassThickness = 2`.
+   **CA-T-517 (2026-11-11):** дубли 1–3 для фасадов устранены — единый `facade-geometry.ts` для цены и 2D; порог 60 и зазоры больше не дублируются. Противоречие 2,8 см vs `carcassThickness = 2` (OI-003/OI-035) остаётся открытым и использует существующее поле 2D шкафа.
+   **CA-T-518 (2026-11-11):** зазоры кухни и мойки приведены к утверждённым: верх/низ 2 мм, сосед 1 мм, открытый край 2 мм, между створками 2 мм суммарно (`FACADE_DOOR_GAP_CM`/`engine.sink.facadeInnerGap` = 0,2 см); `facadeGap = 0,25` и геометрия шкафа не менялись.
 4. `bottleClearOffset = 3.2` (см) vs литерал `−32` (мм) в `KitchenPanel.tsx` (3 места).
 5. `PRICING.kitchen.plinthPerMeter` не используется (кухня считает через `content/plinth.ts`).
 6. `PRICING.kitchen.sinkPartition` не начисляется, поле модели `sinkPartition` очищается нормализацией.
@@ -1109,6 +1119,8 @@ flowchart TD
 - отдельные статьи работ (сборка/доставка) и НДС/логистика;
 - инженерные подтверждения для опор/LED (`preliminary`).
 
+**[РЕШЕНИЕ Q5]** (2026-11-13, §12.5): предварительные категории и записи **без тарифа разрешены** — позиция может существовать в каталоге без `priceRefs`; такие позиции **не участвуют в расчёте**; отсутствующий обязательный тариф **не должен превращаться в нулевую стоимость** (fail-closed текущего движка не ослабляется); позиции отражаются в **диагностике** (раздел 10, требование 5.10/R-08) как предупреждение, а не ошибка публикации.
+
 ## 12.4. Открытые вопросы владельцу проекта
 
 | № | Вопрос | Связано с |
@@ -1130,6 +1142,69 @@ flowchart TD
 
 **Архитектурные решения, требующие отдельного ADR** (самостоятельно не принимаются, раздел 2.5): Q-01, Q-02, Q-03, Q-04, Q-05, Q-13.
 
+**Решения владельца Q1–Q7 по целевой структуре** (2026-11-13; источник — `ADMIN_TARGET_STRUCTURE_RECONCILIATION.md` §16) — см. **§12.5**. Они вопросы Q-01…Q-14 не закрывают и не изменяют.
+
+---
+
+## 12.5. Подтверждённые решения владельца по целевой структуре (Q1–Q7)
+
+**Источник:** `docs/CALCULATION_ADMIN/ADMIN_TARGET_STRUCTURE_RECONCILIATION.md` §16 · **Дата:** 2026-11-13. Решения относятся к целевой модели Calculation Admin и не закрывают и не изменяют вопросы Q-01…Q-14 раздела 12.4. Рекомендации аналитика решениями владельца не являются.
+
+| № | Решение владельца | Суть | Влияние на ТЗ и связанные задачи |
+|---|---|---|---|
+| **Q1** | Правила комплектации | Управляемые нормы комплектации переносятся в **отдельный слой данных**; формулы и алгоритмы расчётного ядра **остаются в коде**; **второй расчётный движок не создаётся**; изменения управляемых правил учитываются в **версионировании и воспроизводимости** расчётов. Реализация не придумывается — отражён только согласованный принцип и необходимые архитектурные зависимости. | Слой правил настоящим ТЗ не проектируется. Требуется **отдельный ADR** — зафиксировано: задача **T-0.6** (Фаза 0) + строка матрицы 11.3; зависимости: **ADR-06** (контракт движка), **раздел 04** (версионирование; связь с правилом design A6/Revision 1 о читаемых движком константах — отнесение правил к версии определяется ADR). Не входит в Этап 1 целевой модели. |
+| **Q2** | Создание сущностей | **R-14 сохраняется.** Новые `PriceItem` — только контролируемым импортом. Новые типы модулей требуют **отдельного архитектурного решения**; создание новых типов модулей через обычные операции админки не описывается как утверждённая возможность. | Соответствует разделу 6.2 (POST-создания `PriceItem` в таблицах API нет; POST есть только для `CatalogItem`) и разделу 11 (T-2.4 — импорт); раздел 06 дополнен оговоркой о R-14. **Открыт:** объём ручного создания записей `CatalogItem`/`ModulePreset` (не подтверждён). |
+| **Q3** | Черновики и публикация | Импорт создаёт записи в статусе **`draft`**; импорт **не публикует** данные автоматически; публикация выполняется **отдельной операцией**; совместимость с **CA-T-208** сохраняется. | Раздел 3.2: `status` каталожных записей пополняется `draft` (реализация — на этапе модели данных, без проектирования механики в ТЗ); раздел 4.3 (публикация отдельно) уже соответствует; раздел 6.2; T-2.4. Контракт CA-T-208 (идемпотентность, отчёт, запрет записи в published/superseded) не переписывается. |
+| **Q4** | Даты действия тарифов | Отдельные даты действия тарифов **не вводятся**; используется существующая модель `PricingVersion`. | Раздел 04 без изменений; поле «дата действия» в целевом реестре цен (§9.1 целевой модели) не применяется; планировщик публикаций не проектируется. |
+| **Q5** | Предварительные позиции | Предварительные категории и записи **без тарифа разрешены**; такие позиции **не участвуют в расчёте**; отсутствующий обязательный тариф **не должен превращаться в нулевую стоимость**; такие позиции **отражаются в диагностике**. | Раздел 12.3 дополнен; раздел 10 и требование 5.10 (пометки `preliminary`); риск R-08; fail-closed текущего движка не ослабляется; для критерия «нельзя опубликовать некорректные обязательные данные»: «обязательный» — для позиций, участвующих в расчёте, для предварительных — предупреждение. |
+| **Q6** | RBAC | **Этап 1 целевой модели не расширяется** механизмом авторизации; **CA-T-602 и CA-T-603 остаются блокирующими** для безопасной публикации; публикация в production **не описывается как безопасная** до выполнения этих блокеров. | Раздел 08 дополнен фактическим обновлением (код CA-T-602/603 — DONE, план v0.77–v0.78; deployment-предусловия ADR-02 — OPEN, v0.84); статусы задач не изменяются; ADR-02 остаётся действующим; Этап 1 целевой модели авторизацию не включает. |
+| **Q7** | Единицы измерения | Набор `unit` **не расширять** до подтверждения конкретных потребностей; «комплект», «пара», «кг» заранее не добавляются. | Раздел 3.2: `enum unit` без изменений; импорт, валидация связей и борд не переписываются. |
+
+**Отдельный ADR (зафиксирована необходимость и зависимость; содержание не утверждается):** слой управляемых правил комплектации — Q1, задача **T-0.6**; зависимости: ADR-06 и раздел 04; оформление назначается отдельно.
+
+### 12.5.1. Фактическое поведение слоя управляемых правил (2026-11-13)
+
+**ADR-07 APPROVED.** Реализовано (CA-T-610/611/612), HTTP/UI отсутствуют (CA-T-613 не начата):
+
+- **Публикация:** явный непустой выбор draft-правил (`id` + `expectedVersion`); авто-публикация запрещена; `preliminary`/archived/дубликаты/устаревшие версии отклоняются; снимок содержит все published + выбранные draft, `contentHash` проверяется при разрешении; повтор идентичного содержимого — replay без дубликата.
+- **Неизменяемость:** published-редакция не редактируется; изменение — новая draft-редакция (`createManagedRuleRevision`), предыдущая published-редакция линии переводится в `archived`.
+- **Расчёт:** DataResolver передаёт `rulesSnapshot` (активный для create/preview, закреплённый для recalculate); отсутствие/повреждение → `RULES_SNAPSHOT_*` fail-closed.
+- **Переход проекта:** preflight, optimistic locking по `updatedAt`, журнал намерения и восстановление, аудит после изменения с откатом при ошибке аудита; replay возвращает результат исходной операции, не текущее состояние проекта.
+- **Ограничение:** межколлекционной транзакции Storage Adapter нет (NEW-N3); атомарность не заявляется.
+- **Admin API (CA-T-613):** чтение правил/редакций/снимков (`/api/admin/rules*`, любая админ-сессия); draft/revision — `catalog.write`; публикация — `price.publish` с `selection` + `expectedVersion` + `confirmed` + `expectedStateVersion`; переход проекта — `recalc.run` (`/api/admin/projects/{id}/rules-transition`, replay пробрасывается как `replay: true`). Мутации — через `guardAdminMutation` (session + same-origin + rate-limit). **Production-публикация:** `NODE_ENV=production` без `FORMAKUB_RULES_PUBLICATION_ENABLED=1` → отказ (до CA-T-511).
+- **Admin UI:** раздел `/admin/rules` — список/карточка/редакции, создание и редактирование draft, новая редакция, выбор и подтверждение публикации, просмотр снимков и active, переход проекта. Архивация draft не реализована (в доменном слое нет операции).
+- **NEW-N1 (нормы 1.1/1.2):** Engine получает полосы петель и плотности фасадов только из `rulesSnapshot` (правила `rule-wardrobe-hinge-band-*`, `rule-wardrobe-facade-density-*`); отсутствие/некорректность → fail-closed; `calcVersion = calc-2026.11.2`; дубли `AdminParameter` удалены; кодовые константы остались только для legacy `pricing.ts` и предупреждения валидации.
+- **NEW-N2 (диагностика, read-only):** `/api/admin/rules/diagnostics/projects`, `/projects/[id]`, `/snapshots/[id]`, `/rules`; статусы и причины для legacy/unknown/corrupt/missing-norms; применённые правила и статическая связь `line:<CalculationLineId>`; UI `/admin/rules/diagnostics`. Мутаций, переключений и перерасчёта нет. Полная трассировка (правило → строка результата с фактическим количеством) не реализована — потребовала бы изменения расчётного контракта.
+- **NEW-N4 (D-7–D-11):** детерминированный seed 27 правил (`managed-rules-seed.ts`, `POST /api/admin/rules/import`, только draft, `source=preliminary`, идемпотентно, конфликт → 409); production gate с явным маркером/флагом/startup-проверкой (`rules-publication-config.ts`); journal публикации + идемпотентный audit recovery (`rules-publication-journal.ts`), recovery при старте и перед публикацией. **Публикация без journal невозможна:** operationId генерируется сервером при отсутствии; replay проверяет/восстанавливает инвариант snapshot → audit; повтор с тем же содержимым не дублирует snapshot/audit. Preliminary-правила не публикуются; owner_confirmed — только после документального подтверждения.
+
+### 12.6. Реализованные разделы Calculation Admin (2026-11-13)
+
+Добавлены read-only разделы, использующие существующие источники истины; второй
+источник данных и новые мутации не создавались. Подробная схема и ограничения:
+`docs/CALCULATION_ADMIN/CALCULATION_ADMIN_CATALOG_MODEL.md`.
+
+| Маршрут | Функциональность | Источник | Мутации |
+|---|---|---|---|
+| `/admin` | расширенные показатели: каталоги по статусам, модули, preliminary-нормы, опубликованные версии, битые priceRefs | CatalogItem, ModulePreset, ManagedRule, PricingVersion | нет |
+| `/admin/materials` | материалы и их attrs/толщины/priceRefs | CatalogItem + PriceItem | нет (ссылка в каталог) |
+| `/admin/modules` | группы кухонных модулей, состав, карточка шкафа | ModulePreset + read-model `MODULE_COMPOSITION` | существующие PATCH/архив пресетов |
+| `/admin/modules/[type]` | диапазоны, состав, связь с правилами и тарифами | ModulePreset, ManagedRule, PriceItem | нет |
+| `/admin/data-sources` | происхождение значений и состояний (confirmed/preliminary/legacy/missing/conflict) | sourceRef/source/updatedBy/pins | нет |
+| `/admin/calculations` | список сохранённых расчётов и диагностика | StoredProject + rules diagnostics | нет |
+| `/admin/calculations/[id]` | проект → модули → строки → правила → версии | StoredProject.config/price/priceHistory | нет |
+| `/admin/versions` | PricingVersion, RulesSnapshot, publication journal, переходы, audit | существующие сервисы | нет |
+| `/admin/diagnostics` | встроены проверки тарифов, источников и состава | diagnoseGraph + data-source checks | нет |
+
+**Навигация:** разделы сгруппированы (A–K); поиск по разделам сохранён.
+
+**Границы:** сохранённый `PriceBreakdown` не содержит id строки, `priceItemId`
+и нормы количества; Inspector не реконструирует их. Для полной трассировки
+требуется изменение расчётного контракта и отдельное архитектурное решение.
+
+**Безопасность:** новые страницы read-only, читают Storage Adapter под
+существующей admin-сессией/layout; RBAC, same-origin, CSRF, rate-limit и
+production gate не ослаблялись. Production-публикация не включалась.
+
 ---
 
 ## Приложение A. Соответствие требованиям заказчика
@@ -1148,3 +1223,53 @@ flowchart TD
 | Помечать неподтверждённые параметры (5.10) | `status=preliminary`, раздел 04 панели |
 
 **Ограничения соблюдены:** программный код не написан (только Markdown), существующие компоненты/API/БД/конфигурации не изменены, зависимости не устанавливались, ошибки не исправлялись, миграции не создавались, реализация не начиналась. Архитектура не менялась — все потенциальные изменения вынесены в ADR раздела 12.
+
+### 12.7. Управляемый состав модулей (Composition Management, 2026-11-13)
+
+Реализован отдельный версионируемый агрегат `CompositionVersion` (коллекция `composition-versions.json`) и встроенные `CompositionLine`. Это **данные администрирования состава**, не второй расчётный движок.
+
+| Аспект | Фактическая реализация |
+|---|---|
+| Схемы | `src/lib/admin/composition-schema.ts` |
+| Сервис | `src/lib/admin/composition.ts` (draft/publish/validate/delete) |
+| Journal/recovery | `src/lib/admin/composition-journal.ts`; recovery в `instrumentation.ts` |
+| Seed | `src/lib/admin/composition-seed.ts` — идемпотентный импорт `MODULE_COMPOSITION`, только draft, `source=preliminary` |
+| API | `GET/POST /api/admin/compositions`, `GET/PATCH/DELETE /[id]`, `GET /[id]/validate`, `POST /[id]/publish`, `POST /import` |
+| Project pin | `StoredProject.compositionVersionId?`; `POST /api/admin/projects/[id]/composition-transition` |
+| UI | `/admin/modules`, `/admin/modules/[type]`, Inspector (`/admin/calculations/[projectId]`) |
+| RBAC | draft/import — `catalog.write`; publish — `price.publish`; transition — `recalc.run` |
+| Audit | `composition.create/update/publish/delete`, `project.composition_transition` |
+| Immutability | published/superseded не редактируются; изменение — новый draft из published |
+| Optimistic locking | `expectedVersion` для PATCH/publish; `expectedUpdatedAt` для pin |
+| Content hash | SHA-256 канонического `lines + rulesSnapshotId` |
+| Validation | CatalogItem/PriceItem/ManagedRule ссылки; published PricingVersion snapshot; preliminary/fixed; alternativeGroup; дубликаты; покрытие 8 типов |
+| Project compatibility | поле optional; `schemaVersion` не повышен; старые проекты читаются; сохранённый PriceSnapshot не меняется |
+| Engine | формулы не изменены; `DataResolver` выполняет preflight для закреплённой версии; количества/суммы Engine по-прежнему вычисляет код |
+| Trace | `CalculationBreakdown` не расширен; component-level trace — BLOCKED отдельным решением |
+
+**Ограничение:** состав не участвует в формулах и не меняет суммы. Для трассы «модуль → компонент → норма → тариф → строка» требуется отдельный ADR и изменение контракта `CalculationBreakdown`/истории.
+
+### 12.8. Composition Management — remediation Q1–Q8 (2026-11-16)
+
+Утверждённые решения внедрены в существующий `CompositionVersion` без нового механизма версионирования.
+
+| Решение | Реализация |
+|---|---|
+| Q1 | `rulesSnapshotId` фиксируется при публикации, если есть rule refs; validation/recovery используют снимок, не текущую коллекцию; project pin проверяет совпадение composition/project rules snapshot; DataResolver проверяет пару. |
+| Q2 | `source=preliminary` CompositionLine блокирует публикацию (error), draft разрешён. |
+| Q3 | `owner_confirmed` — только отдельная операция `POST /api/admin/compositions/[id]/confirm` (`price.publish`), с actor/date/reference; обычный PATCH не может назначить/изменить подтверждённую строку. |
+| Q4 | `pins.catalogVersions`, `pins.priceItemVersions`, `pins.priceVersionId` фиксируются при публикации и входят в `contentHash`; drift отображается предупреждением. |
+| Q5 | `production.status` (`not_ready|approved`) отделён от published; `POST /api/admin/compositions/[id]/production-approval`; в production DataResolver блокирует неодобренную composition. |
+| Q6 | `priceRole` не вводился; configurable-слот не может иметь один явный `priceItemId`; тариф слота определяется каталогом/конфигурацией. |
+| Q7 | `ADR-08-COMPOSITION-VERSIONING.md`; текущая модель документирована, новая модель не вводилась. |
+| Q8 | `conditional` требует condition; `quantityRef.code`/`condition.code` ограничены реестром `composition-code-registry.ts`; неизвестный код блокируется. |
+
+Дополнительно:
+
+- `contentHash` проверяется при чтении (`readCompositionStore`), validation, preflight, transition и journal recovery.
+- Коллекция читается per-record; повреждённая запись попадает в issues и не блокирует валидные версии.
+- Publication journal: `rulesSnapshotId`, pins и hash; replay после supersede идемпотентен; recovery принимает superseded.
+- Transition journal: `prepared → project_updated → audit_pending → completed`; recovery при старте.
+- Create/update/delete/confirm/approve: audit rollback в процессе; отдельного crash-journal нет.
+- UI: dirty-state, publish confirmation, sourceRef не подставляется, code select, owner confirmation, production gate, composition status в Inspector.
+- Schema: `confirmation`, `pins`, `production`, `migration`; `sortOrder` ≥0 и уникален; length limits; `sourceVersionId` только published.

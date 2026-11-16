@@ -31,11 +31,15 @@ describe("kitchen pricing", () => {
   });
 
   it("increases the total when the facade material becomes more expensive", () => {
-    const base = defaultKitchen();
+    const base = {
+      ...defaultKitchen(),
+      facadeMaterial: "ldsp" as const,
+      facadeFinish: "milk",
+    };
     const premium = {
       ...base,
-      facadeMaterial: "solid" as const,
-      facadeFinish: "oak",
+      facadeMaterial: "mdf" as const,
+      facadeFinish: "milk",
     };
 
     expect(calculateKitchenPrice(premium).total).toBeGreaterThan(
@@ -56,6 +60,78 @@ describe("kitchen pricing", () => {
     expect(calculateKitchenPrice(wider).total).toBeGreaterThan(
       calculateKitchenPrice(base).total,
     );
+  });
+
+  it("не учитывает sink.shelves повторно при наличии sinkStorage (CA-T-511)", () => {
+    const base = defaultKitchen();
+    const sink = base.modules.find((module) => module.type === "sink")!;
+    const withBoth = {
+      ...base,
+      modules: base.modules.map((module) =>
+        module.id === sink.id
+          ? {
+              ...module,
+              shelves: 2,
+              sinkStorage: [{ shelves: 2, drawers: 0 }],
+            }
+          : module,
+      ),
+    };
+    const price = calculateKitchenPrice(withBoth);
+    expect(price.optionsCost).toBe(49821);
+    expect(
+      price.lines.find((line) => line.label === "Столешница, цоколь и опции")
+        ?.detail,
+    ).toContain("7 полок");
+  });
+
+  it("обычные полки без sinkStorage не меняются", () => {
+    const price = calculateKitchenPrice(defaultKitchen());
+    expect(price.optionsCost).toBe(49821);
+    expect(
+      price.lines.find((line) => line.label === "Столешница, цоколь и опции")
+        ?.detail,
+    ).toContain("7 полок");
+  });
+
+  it("sink.shelves без sinkStorage сохраняет прежнее поведение", () => {
+    const base = defaultKitchen();
+    const sink = base.modules.find((module) => module.type === "sink")!;
+    const legacy = {
+      ...base,
+      modules: base.modules.map((module) =>
+        module.id === sink.id ? { ...module, shelves: 2 } : module,
+      ),
+    };
+    const price = calculateKitchenPrice(legacy);
+    expect(price.optionsCost).toBe(52021);
+    expect(
+      price.lines.find((line) => line.label === "Столешница, цоколь и опции")
+        ?.detail,
+    ).toContain("9 полок");
+  });
+
+  it("при sinkStorage полки берутся из секций ровно один раз", () => {
+    const base = defaultKitchen();
+    const sink = base.modules.find((module) => module.type === "sink")!;
+    const withStorage = (shelves: number, unitShelves: number) => ({
+      ...base,
+      modules: base.modules.map((module) =>
+        module.id === sink.id
+          ? {
+              ...module,
+              width: 120,
+              shelves: unitShelves,
+              sinkStorage: [{ shelves, drawers: 0 }],
+            }
+          : module,
+      ),
+    });
+    const zero = calculateKitchenPrice(withStorage(0, 0));
+    const sectionShelves = calculateKitchenPrice(withStorage(2, 0));
+    const bothSources = calculateKitchenPrice(withStorage(2, 2));
+    expect(sectionShelves.optionsCost).toBeGreaterThan(zero.optionsCost);
+    expect(bothSources.optionsCost).toBe(sectionShelves.optionsCost);
   });
 
   it("prices the bottle rack as the mechanism only — facade like other facades", () => {
@@ -79,17 +155,13 @@ describe("kitchen pricing", () => {
     const plain = calculateKitchenPrice(withModules(false));
     const bottle = calculateKitchenPrice(withModules(true));
 
-    // Механизм бутылочницы — ровно его цена (с коэффициентом сложности
-    // конфигурации); фасады/петли/перегородки/полки не меняются: фасад секции
-    // считается по площади модуля как остальные, перегородка реза — как
-    // корпус, отдельной опцией не тарифицируется.
-    const factor =
-      1 +
-      Math.max(0, base.modules.length - 3) *
-        PRICING.kitchen.complexityPerExtraModule;
-    const expected = Math.round(PRICING.kitchen.bottleRack * factor);
-    expect(bottle.subtotal - plain.subtotal).toBe(expected);
-    expect(bottle.total - plain.total).toBe(expected);
+    // Механизм бутылочницы тарифицируется отдельной опцией; фасады при этом
+    // считаются по фактическим панелям секций (CA-T-517), поэтому разница
+    // итогов не равна одной лишь цене механизма и здесь не проверяется.
+    expect(bottle.optionsCost - plain.optionsCost).toBe(
+      PRICING.kitchen.bottleRack,
+    );
+    expect(bottle.subtotal).toBeGreaterThan(plain.subtotal);
   });
 
   it("applies an eligible percentage promo with a cap", () => {
@@ -140,10 +212,11 @@ describe("wardrobe pricing", () => {
     const small: WardrobeConfig = {
       ...defaultWardrobe(),
       height: 180,
+      widthMm: 600,
+      partition: null,
       sections: [
         {
           id: "s-1",
-          width: 60,
           shelves: [],
           rods: [],
           drawers: 0,

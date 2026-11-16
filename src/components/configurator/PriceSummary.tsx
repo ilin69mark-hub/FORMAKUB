@@ -1,16 +1,27 @@
 import { AlertCircle, Check, Info } from "lucide-react";
 import type { PriceBreakdown } from "@/lib/configurator/types";
-import { formatRange, formatRub } from "@/lib/configurator/pricing";
+import { formatRange, formatRub } from "@/lib/configurator/display";
 
 export function PriceSummary({
   price,
   compact = false,
   dark = false,
 }: {
-  price: PriceBreakdown;
+  price: PriceBreakdown | null;
   compact?: boolean;
   dark?: boolean;
 }) {
+  if (!price) {
+    return (
+      <div className={dark ? "text-cream/55" : "text-ink/52"}>
+        <div className="text-[0.64rem] font-bold uppercase tracking-[0.18em]">
+          Ориентировочно
+        </div>
+        <div className="mt-1 text-[0.9rem]">Расчёт загружается…</div>
+      </div>
+    );
+  }
+
   const textMuted = dark ? "text-cream/55" : "text-ink/52";
   const textStrong = dark ? "text-cream" : "text-ink";
   const divider = dark ? "border-white/12" : "border-ink/10";

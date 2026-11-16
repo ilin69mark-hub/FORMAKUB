@@ -5,14 +5,31 @@ import {
   FACADE_STYLES,
   HANDLES,
   KITCHEN_MODULES,
+  LEGACY_FACADE_MATERIALS,
 } from "@/content/catalog";
 import { PRICING, PROMOS, type PromoDefinition } from "@/content/pricing";
 import { findPlinthMaterial, plinthRatePerMeter } from "@/content/plinth";
 import { findPlinthMount, findSupportSystem } from "@/content/supports";
+import type { CalculationInputs } from "./contract";
 import { computeLighting } from "./lighting";
+import { FIXED_BODY_MATERIAL_ID } from "./materials";
 import { computeSupports } from "./supports";
 import { sinkFacadeTotals, sinkLayout, sinkRowContext } from "./sink";
+import { wardrobeBodyAreaSqm, wardrobeGeometry } from "./wardrobe-geometry";
+import { wardrobeFacadeGeometry } from "./wardrobe-facade-geometry";
+import { wardrobeHingePlan } from "./wardrobe-hinges";
+import { wardrobeDrawerCount, wardrobeRodCount } from "./wardrobe-components";
+import { wardrobeEdgePlan } from "./wardrobe-edge";
 import type { SinkRowContext } from "./sink";
+import {
+  FACADE_DRAWER_GAP_CM,
+  FACADE_EDGE_GAP_CM,
+  FACADE_NEIGHBOR_GAP_CM,
+  facadeDoorCount,
+  facadeStack,
+  kitchenFacadeField,
+  sinkFacadeArea,
+} from "./facade-geometry";
 import type {
   FurnitureConfig,
   KitchenConfig,
@@ -21,11 +38,23 @@ import type {
   PriceLine,
   PromoResult,
   WardrobeConfig,
-  WardrobeSection,
 } from "./types";
 
-export const PRICE_DISCLAIMER =
-  "Предварительный расчёт. Итоговая стоимость будет подтверждена после проверки размеров, материалов, комплектации и технических условий менеджером.";
+import {
+  PRICE_DISCLAIMER,
+  formatRub,
+  kitchenFloorModules,
+} from "./display";
+
+export {
+  PRICE_DISCLAIMER,
+  formatRange,
+  formatRub,
+  kitchenFloorModules,
+  kitchenTotalWidth,
+  kitchenUpperModules,
+  wardrobeWidth,
+} from "./display";
 
 function roundMoney(value: number): number {
   const step = PRICING.rounding;
@@ -40,24 +69,94 @@ function area(widthCm: number, heightCm: number): number {
   return (safe(widthCm) * safe(heightCm)) / 10000;
 }
 
-function bodyRate(config: KitchenConfig | WardrobeConfig): number {
-  return BODY_MATERIALS.find((item) => item.id === config.bodyMaterial)?.ratePerSqm ?? 0;
+/**
+ * A16-4 — контракт поиска тарифа в legacy-расчёте.
+ *
+ * Различаются четыре случая:
+ *  1. Явно бесплатный вариант — `handle: "none"`: реальная запись каталога
+ *     `HANDLES` с `rate: 0`, поиск возвращает 0 штатно.
+ *  2. Отсутствующий необязательный параметр — к этим помощникам не относится:
+ *     они читают обязательные поля конфигурации, значения по умолчанию
+ *     расставляет `schema.ts`.
+ *  3. Неизвестный идентификатор — недопустим: `schema.ts` объявляет поля
+ *     `z.enum`, а сохранение/чтение проектов проходит через `safeParseConfig`.
+ *     Такой id означает повреждённые данные → контролируемая ошибка.
+ *  4. Устаревшие данные проекта — исторические материалы фасада
+ *     (`veneer`/`glass`/`solid`) входят в схему и читаются в старых
+ *     проектах, но `ratePerSqm` не имеют: результат остаётся прежним (0 ₽).
+ *     Менять это поведение без решения владельца нельзя — см. PROJECT_AUDIT
+ *     A16-4 (отложено, риск для старых проектов).
+ */
+function unknownCatalogId(kind: string, id: string): Error {
+  return new Error(`Legacy pricing: неизвестный ${kind} "${id}"`);
+}
+
+function missingRate(kind: string, id: string): Error {
+  return new Error(`Legacy pricing: нет тарифа ${kind} "${id}"`);
+}
+
+/**
+ * Q-A17-2.3: известный материал без **действующего** тарифа — контролируемая
+ * ошибка с идентификатором. Не возвращаем 0 ₽, не подставляем исторический
+ * тариф (11 800 / 14 400 / 18 600 ₽/м²) и не пропускаем расчёт фасадов.
+ */
+function missingActiveTariff(kind: string, id: string): Error {
+  return new Error(
+    `Legacy pricing: нет действующего тарифа для ${kind} "${id}"; расчёт фасадов невозможен`,
+  );
+}
+
+function bodyRate(): number {
+  const material = BODY_MATERIALS.find(
+    (item) => item.id === FIXED_BODY_MATERIAL_ID,
+  );
+  if (!material) {
+    throw unknownCatalogId("bodyMaterial", FIXED_BODY_MATERIAL_ID);
+  }
+  if (material.ratePerSqm === undefined) {
+    throw missingRate("bodyMaterial", FIXED_BODY_MATERIAL_ID);
+  }
+  return material.ratePerSqm;
 }
 
 function facadeRate(config: KitchenConfig | WardrobeConfig): number {
-  return FACADE_MATERIALS.find((item) => item.id === config.facadeMaterial)?.ratePerSqm ?? 0;
+  const active = FACADE_MATERIALS.find(
+    (item) => item.id === config.facadeMaterial,
+  );
+  if (active) {
+    if (active.ratePerSqm === undefined) {
+      throw missingRate("facadeMaterial", config.facadeMaterial);
+    }
+    return active.ratePerSqm;
+  }
+  // Q-A17-2.3: материала нет среди действующих ставок → ошибка, а не 0 ₽.
+  // Исторический тариф автоматически не подставляется (см. материалы выше).
+  if (
+    LEGACY_FACADE_MATERIALS.some((item) => item.id === config.facadeMaterial)
+  ) {
+    throw missingActiveTariff("facadeMaterial", config.facadeMaterial);
+  }
+  throw unknownCatalogId("facadeMaterial", config.facadeMaterial);
 }
 
 function styleMultiplier(config: KitchenConfig | WardrobeConfig): number {
-  return FACADE_STYLES.find((item) => item.id === config.facadeStyle)?.multiplier ?? 1;
+  const style = FACADE_STYLES.find((item) => item.id === config.facadeStyle);
+  if (!style) {
+    throw unknownCatalogId("facadeStyle", config.facadeStyle);
+  }
+  return style.multiplier;
 }
 
 function handleRate(handle: KitchenConfig["handle"]): number {
-  return HANDLES.find((item) => item.id === handle)?.rate ?? 0;
+  const found = HANDLES.find((item) => item.id === handle);
+  if (!found) {
+    throw unknownCatalogId("handle", handle);
+  }
+  return found.rate;
 }
 
 export function doorCountForWidth(width: number): number {
-  return width > 60 ? 2 : 1;
+  return facadeDoorCount(width);
 }
 
 export function kitchenDoorCount(
@@ -71,32 +170,78 @@ export function kitchenDoorCount(
   return doorCountForWidth(module.width);
 }
 
-export function kitchenFloorModules(config: KitchenConfig): KitchenModule[] {
-  return config.modules.filter((module) => KITCHEN_MODULES[module.type].zone === "floor");
-}
-
-export function kitchenUpperModules(config: KitchenConfig): KitchenModule[] {
-  return config.modules.filter((module) => KITCHEN_MODULES[module.type].zone === "upper");
-}
-
-export function kitchenTotalWidth(config: KitchenConfig): number {
-  const floor = kitchenFloorModules(config).reduce((sum, module) => sum + module.width, 0);
-  const upper = kitchenUpperModules(config).reduce((sum, module) => sum + module.width, 0);
-  return Math.max(floor, upper);
-}
-
 export function kitchenCountertopWidth(config: KitchenConfig): number {
+  // TG-C3 (подтверждено владельцем): наружная ширина самостоятельной
+  // напольной бутылочницы (`type === "bottle"`, 150/200/300 мм) входит в
+  // длину столешницы. Встроенный механизм бутылочки внутри модуля
+  // (`sinkStorage[].bottle`) ширину не добавляет — модуль уже посчитан.
   return config.modules
-    .filter((module) => ["base", "sink", "hob", "drawers"].includes(module.type))
+    .filter((module) =>
+      ["base", "sink", "hob", "drawers", "bottle"].includes(module.type),
+    )
     .reduce((sum, module) => sum + module.width, 0);
 }
 
-export function wardrobeWidth(config: WardrobeConfig): number {
-  return config.sections.reduce((sum, section) => sum + section.width, 0);
+interface KitchenRowPosition {
+  start: boolean;
+  end: boolean;
 }
 
-export function wardrobeDoorCount(section: WardrobeSection): number {
-  return doorCountForWidth(section.width);
+function kitchenRowPositions(
+  modules: KitchenModule[],
+): Map<string, KitchenRowPosition> {
+  const positions = new Map<string, KitchenRowPosition>();
+  for (const zone of ["floor", "upper"] as const) {
+    const row = modules.filter(
+      (module) => KITCHEN_MODULES[module.type]?.zone === zone,
+    );
+    row.forEach((module, index) => {
+      positions.set(module.id, {
+        start: index === 0,
+        end: index === row.length - 1,
+      });
+    });
+  }
+  return positions;
+}
+
+/** Фактическая площадь фасадов модуля кухни (CA-T-517). */
+function kitchenModuleFacadeArea(
+  unit: KitchenModule,
+  position: KitchenRowPosition,
+  config: KitchenConfig,
+  sinkRow?: SinkRowContext,
+): number {
+  const field = kitchenFacadeField({
+    widthCm: unit.width,
+    heightCm: unit.height,
+    type: unit.type,
+    rowStart: position.start,
+    rowEnd: position.end,
+    plinthHeightCm: config.plinth ? config.plinthHeight : 0,
+  });
+  if (unit.type === "sink") {
+    const layout = sinkLayout(
+      unit,
+      {
+        left: position.start ? FACADE_EDGE_GAP_CM : FACADE_NEIGHBOR_GAP_CM,
+        right: position.end ? FACADE_EDGE_GAP_CM : FACADE_NEIGHBOR_GAP_CM,
+      },
+      sinkRow,
+    );
+    return sinkFacadeArea(layout.facadeBoxes, field.fieldHeightCm);
+  }
+  if (unit.type === "drawers") {
+    return facadeStack({
+      widthCm: field.fieldWidthCm,
+      heightCm: field.fieldHeightCm,
+      topGapCm: 0,
+      bottomGapCm: 0,
+      gapCm: FACADE_DRAWER_GAP_CM,
+      count: unit.drawers,
+    }).areaSqm;
+  }
+  return field.areaSqm;
 }
 
 function applyPromo(
@@ -168,8 +313,11 @@ function calculatePromo(
   };
 }
 
-export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
-  const body = bodyRate(config);
+export function calculateKitchenPrice(
+  config: KitchenConfig,
+  inputs?: CalculationInputs,
+): PriceBreakdown {
+  const body = bodyRate();
   const facade = facadeRate(config);
   const style = styleMultiplier(config);
   const handle = handleRate(config.handle);
@@ -190,6 +338,7 @@ export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
       sinkRows.set(unit.id, sinkRowContext(config.modules, unit.id));
     }
   }
+  const rowPositions = kitchenRowPositions(config.modules);
 
   for (const unit of config.modules) {
     const preset = KITCHEN_MODULES[unit.type];
@@ -203,47 +352,77 @@ export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
     const doors = sinkTotals
       ? sinkTotals.doors
       : kitchenDoorCount(unit, sinkRow);
+    const facadeArea = kitchenModuleFacadeArea(
+      unit,
+      rowPositions.get(unit.id) ?? { start: true, end: true },
+      config,
+      sinkRow,
+    );
     // У мойки каждый фронт ящиков и панель бутылочки — отдельный фасад.
-    doorsTotal += sinkTotals ? sinkTotals.panels : doors;
-    if (doors > 0) {
-      // Фасады мойки считаются ниже по фактическим панелям (без двойного
-      // счёта площади модуля).
-      if (sinkTotals === null) frontsCost += moduleArea * facade * style;
-      fittingsCost += doors * PRICING.kitchen.hingePerDoor;
-      if (config.hinge === "soft") {
-        fittingsCost += doors * PRICING.kitchen.softClosePerDoor;
+    if (sinkTotals) {
+      doorsTotal += sinkTotals.panels;
+      frontsCost += facadeArea * facade * style;
+      if (doors > 0) {
+        fittingsCost += doors * PRICING.kitchen.hingePerDoor;
+        if (config.hinge === "soft") {
+          fittingsCost += doors * PRICING.kitchen.softClosePerDoor;
+        }
+        if (config.pushToOpen) {
+          fittingsCost += doors * PRICING.kitchen.pushToOpenPerDoor;
+        }
+        if (config.handle !== "none") {
+          fittingsCost += doors * handle;
+        }
       }
-      if (config.pushToOpen) {
-        fittingsCost += doors * PRICING.kitchen.pushToOpenPerDoor;
-      }
-      if (config.handle !== "none") {
-        fittingsCost += doors * handle;
-      }
-    } else if (unit.type === "drawers") {
-      drawerTotal += unit.drawers;
-      const frontArea = area(unit.width, unit.height) / Math.max(1, unit.drawers);
-      frontsCost += frontArea * unit.drawers * facade * style;
-      fittingsCost += unit.drawers * PRICING.kitchen.drawerSlide;
-      if (config.hinge === "soft") {
-        fittingsCost += unit.drawers * PRICING.kitchen.drawerSoftClose;
-      }
-      if (config.handle !== "none") {
-        fittingsCost += unit.drawers * handle;
+    } else {
+      doorsTotal += doors;
+      if (doors > 0) {
+        frontsCost += facadeArea * facade * style;
+        fittingsCost += doors * PRICING.kitchen.hingePerDoor;
+        if (config.hinge === "soft") {
+          fittingsCost += doors * PRICING.kitchen.softClosePerDoor;
+        }
+        if (config.pushToOpen) {
+          fittingsCost += doors * PRICING.kitchen.pushToOpenPerDoor;
+        }
+        if (config.handle !== "none") {
+          fittingsCost += doors * handle;
+        }
+      } else if (unit.type === "drawers") {
+        drawerTotal += unit.drawers;
+        frontsCost += facadeArea * facade * style;
+        fittingsCost += unit.drawers * PRICING.kitchen.drawerSlide;
+        if (config.hinge === "soft") {
+          fittingsCost += unit.drawers * PRICING.kitchen.drawerSoftClose;
+        }
+        if (config.handle !== "none") {
+          fittingsCost += unit.drawers * handle;
+        }
       }
     }
 
-    shelfTotal += unit.shelves;
+    // Для мойки источником полок является sinkStorage (layout секций).
+    // unit.shelves на sink — legacy-поле; при наличии sinkStorage оно не
+    // должно учитываться повторно. Без sinkStorage поведение сохраняется.
+    if (unit.type !== "sink" || !Array.isArray(unit.sinkStorage)) {
+      shelfTotal += unit.shelves;
+    }
     if (unit.type === "sink") {
       optionsCost += PRICING.kitchen.sinkCutout;
-      // Перегородки — часть корпуса, отдельно не тарифицируются. Фасады
-      // считаются по фактическим панелям (включая фронты ящиков и узкую
-      // панель бутылочки) — без двойного счёта по площади модуля.
-      const sink = sinkLayout(unit, undefined, sinkRow);
-      const panelWidth = sink.facadeBoxes.reduce(
-        (sum, box) => sum + box.width,
-        0,
+      // Перегородки — часть корпуса, отдельно не тарифицируются. Площадь
+      // фасадов уже учтена по фактическим панелям выше.
+      const sink = sinkLayout(
+        unit,
+        {
+          left: rowPositions.get(unit.id)?.start
+            ? FACADE_EDGE_GAP_CM
+            : FACADE_NEIGHBOR_GAP_CM,
+          right: rowPositions.get(unit.id)?.end
+            ? FACADE_EDGE_GAP_CM
+            : FACADE_NEIGHBOR_GAP_CM,
+        },
+        sinkRow,
       );
-      frontsCost += area(panelWidth, unit.height) * facade * style;
       for (const section of sink.sections) {
         if (section.comms) continue;
         if (section.bottle > 0) {
@@ -284,7 +463,7 @@ export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
   );
 
   // Опоры и крепёж цоколя: единый расчёт для 2D-схемы, спецификации и цены.
-  const supportPlan = computeSupports(config);
+  const supportPlan = computeSupports(config, inputs);
   optionsCost += supportPlan.cost;
   const systemLabel = findSupportSystem(supportPlan.systemId).label;
 
@@ -298,7 +477,7 @@ export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
   optionsCost += plinthCost;
 
   // Подсветка: комплектная спецификация вместо фиксированной цены за метр.
-  const lightingPlan = computeLighting(config);
+  const lightingPlan = computeLighting(config, inputs);
   if (config.underCabinetLighting) {
     optionsCost += lightingPlan.cost;
   }
@@ -449,31 +628,34 @@ export function calculateKitchenPrice(config: KitchenConfig): PriceBreakdown {
   };
 }
 
-export function calculateWardrobePrice(config: WardrobeConfig): PriceBreakdown {
-  const body = bodyRate(config);
+export function calculateWardrobePrice(
+  config: WardrobeConfig,
+  _inputs?: CalculationInputs,
+): PriceBreakdown {
+  void _inputs; // зарезервировано для CA-T-304/306; текущий источник — content.
+  const body = bodyRate();
   const facade = facadeRate(config);
   const style = styleMultiplier(config);
   const handle = handleRate(config.handle);
-  const width = wardrobeWidth(config);
-  const totalArea = area(width, config.height);
-  const depthFactor = config.depth / PRICING.wardrobe.bodyDepthReference;
+  const geometry = wardrobeGeometry(config);
+  const width = geometry.widthMm / 10;
+  const totalArea = wardrobeBodyAreaSqm(geometry);
+  const bodyCost = totalArea * body;
+  const facadeGeometry = wardrobeFacadeGeometry(config, geometry);
+  const facadeArea = facadeGeometry.totalAreaSqm;
+  const frontsCost = facadeArea * facade * style;
 
-  const bodyCost = totalArea * body * depthFactor * PRICING.wardrobe.bodyFactor;
-  const frontsCost = totalArea * facade * style;
-
-  let doorsTotal = 0;
+  const doorsTotal = facadeGeometry.panels.length;
+  const hingePlan = wardrobeHingePlan(config);
   let shelfTotal = 0;
-  let rodTotal = 0;
-  let drawerTotal = 0;
   for (const section of config.sections) {
-    doorsTotal += wardrobeDoorCount(section);
     shelfTotal += section.shelves.length;
-    rodTotal += section.rods.length;
-    drawerTotal += section.drawers;
   }
+  const rodTotal = wardrobeRodCount(config);
+  const drawerTotal = wardrobeDrawerCount(config);
 
   let fittingsCost =
-    doorsTotal * PRICING.wardrobe.hingePerDoor +
+    hingePlan.totalHinges * PRICING.wardrobe.hingePerDoor +
     drawerTotal * PRICING.wardrobe.drawer;
   if (config.hinge === "soft") {
     fittingsCost += doorsTotal * PRICING.wardrobe.softClosePerDoor;
@@ -494,6 +676,17 @@ export function calculateWardrobePrice(config: WardrobeConfig): PriceBreakdown {
   if (config.ledLighting) {
     optionsCost += config.sections.length * PRICING.wardrobe.ledPerSection;
   }
+  const edgePlan = wardrobeEdgePlan(
+    config,
+    {
+      pvc04: PRICING.wardrobe.edgePvc04,
+      pvc1: PRICING.wardrobe.edgePvc1,
+      pvc2: PRICING.wardrobe.edgePvc2,
+    },
+    geometry,
+    facadeGeometry,
+  );
+  optionsCost += edgePlan.totalCost;
 
   const lines: PriceLine[] = [
     {
@@ -577,15 +770,10 @@ export function calculateWardrobePrice(config: WardrobeConfig): PriceBreakdown {
   };
 }
 
-export function calculatePrice(config: FurnitureConfig): PriceBreakdown {
-  if (config.kind === "kitchen") return calculateKitchenPrice(config);
-  return calculateWardrobePrice(config);
-}
-
-export function formatRub(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(Math.round(value))} ₽`;
-}
-
-export function formatRange(value: number): string {
-  return `${formatRub(value * 0.9)} — ${formatRub(value * 1.1)}`;
+export function calculatePrice(
+  config: FurnitureConfig,
+  inputs?: CalculationInputs,
+): PriceBreakdown {
+  if (config.kind === "kitchen") return calculateKitchenPrice(config, inputs);
+  return calculateWardrobePrice(config, inputs);
 }

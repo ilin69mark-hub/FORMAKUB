@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight, Check, Copy, Tag } from "lucide-react";
 import { PROMOS } from "@/content/pricing";
-import { formatRub } from "@/lib/configurator/pricing";
+import { formatRub } from "@/lib/configurator/display";
 
 export function PromotionsSection() {
   const [copied, setCopied] = useState<string | null>(null);

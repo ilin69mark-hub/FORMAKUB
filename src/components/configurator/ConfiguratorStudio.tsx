@@ -25,18 +25,21 @@ import {
 import { FURNITURE_TYPES, WARDROBE_LIMITS } from "@/content/catalog";
 import { defaultConfig } from "@/lib/configurator/defaults";
 import {
-  calculatePrice,
   formatRub,
   kitchenTotalWidth,
   wardrobeWidth,
-} from "@/lib/configurator/pricing";
+} from "@/lib/configurator/display";
+import { useCalculationInputs } from "@/lib/configurator/use-calculation-inputs";
 import { isConfigValid, validateConfig } from "@/lib/configurator/validation";
 import { moveKitchenModule } from "@/lib/configurator/kitchenMove";
 import { normalizeKitchen } from "@/lib/configurator/defaults";
 import {
   clearLocalDraft,
+  clearPendingSaveOperation,
   loadLocalDraft,
+  loadPendingSaveOperation,
   saveLocalDraft,
+  savePendingSaveOperation,
 } from "@/lib/configurator/storage";
 import type { FurnitureConfig, FurnitureType } from "@/lib/configurator/types";
 import { KitchenScene } from "@/components/configurator/KitchenScene";
@@ -87,6 +90,55 @@ function firstSelection(config: FurnitureConfig): string | null {
 function normalizePromo(value: string | undefined): string | undefined {
   const trimmed = value?.trim().toUpperCase();
   return trimmed ? trimmed.slice(0, 32) : undefined;
+}
+
+function canonicalValue(value: unknown): unknown {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(source).sort()) {
+      if (source[key] === undefined) continue;
+      result[key] = canonicalValue(source[key]);
+    }
+    return result;
+  }
+  return value;
+}
+
+async function configFingerprint(config: FurnitureConfig): Promise<string | null> {
+  try {
+    if (typeof crypto === "undefined" || typeof crypto.subtle === "undefined") {
+      return null;
+    }
+    const payload = new TextEncoder().encode(
+      JSON.stringify(canonicalValue(config)),
+    );
+    const digest = await crypto.subtle.digest("SHA-256", payload);
+    return Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+  } catch {
+    return null;
+  }
+}
+
+function createOperationId(): string | null {
+  try {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // Fall through to the visible error below.
+  }
+  return null;
 }
 
 export function ConfiguratorStudio({
@@ -230,7 +282,7 @@ export function ConfiguratorStudio({
     return [...new Set(ids)];
   }, [errors]);
   const valid = isConfigValid(issues);
-  const price = useMemo(() => calculatePrice(config), [config]);
+  const { price } = useCalculationInputs(config);
   const selectedExists =
     config.kind === "kitchen"
       ? config.modules.some((item) => item.id === selectedId)
@@ -269,25 +321,63 @@ export function ConfiguratorStudio({
     if (!valid || savingProject) return;
     setSavingProject(true);
     setSaveProjectError("");
+
     try {
+      const fingerprint = await configFingerprint(config);
+      if (!fingerprint) {
+        setSaveProjectError(
+          "Браузер не поддерживает безопасное сохранение. Обновите браузер.",
+        );
+        return;
+      }
+
+      const pending = loadPendingSaveOperation(config.kind);
+      let operationId: string;
+      if (pending && pending.configFingerprint === fingerprint) {
+        operationId = pending.operationId;
+      } else {
+        const created = createOperationId();
+        if (!created) {
+          setSaveProjectError(
+            "Браузер не поддерживает безопасное сохранение. Обновите браузер.",
+          );
+          return;
+        }
+        operationId = created;
+        savePendingSaveOperation(config.kind, {
+          operationId,
+          configFingerprint: fingerprint,
+        });
+      }
+
       const response = await fetch("/api/projects", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": operationId,
+        },
         body: JSON.stringify({ config }),
       });
       const data = (await response.json().catch(() => null)) as
-        | { ok: boolean; id?: string; error?: string }
+        | { ok: boolean; id?: string; error?: string; replay?: boolean }
         | null;
       if (!response.ok || !data?.ok || !data.id) {
+        // 400/409/422 — окончательный отказ для этого ключа. 429/5xx —
+        // временная ошибка: ключ сохраняется для повторной попытки.
+        if (response.status === 400 || response.status === 409 || response.status === 422) {
+          clearPendingSaveOperation(config.kind);
+        }
         setSaveProjectError(data?.error ?? "Не удалось сохранить проект.");
         return;
       }
+      clearPendingSaveOperation(config.kind);
       setSavedProjectId(data.id);
       const url = new URL(window.location.href);
       url.searchParams.set("project", data.id);
       url.searchParams.delete("promo");
       window.history.replaceState(null, "", url.toString());
     } catch {
+      // Ключ сохраняется: повторная попытка после reload не создаст дубль.
       setSaveProjectError("Не удалось связаться с сервером.");
     } finally {
       setSavingProject(false);
@@ -326,7 +416,7 @@ export function ConfiguratorStudio({
   const depth =
     config.kind === "kitchen"
       ? (config.modules[0]?.depth ?? 60)
-      : config.depth;
+      : config.fullDepth / 10;
   const itemCount =
     config.kind === "kitchen" ? config.modules.length : config.sections.length;
   const configLabel = FURNITURE_TYPES[config.kind].label;
@@ -586,7 +676,7 @@ export function ConfiguratorStudio({
                 круглые кнопки ←/→ у выбранного модуля.
               </span>
               <span>
-                {maxWidth !== null ? `${totalWidth} / ${maxWidth} см` : `${totalWidth} см`} · {formatRub(price.total)}
+                {maxWidth !== null ? `${totalWidth} / ${maxWidth} см` : `${totalWidth} см`} · {price ? formatRub(price.total) : "—"}
               </span>
             </div>
 
@@ -737,7 +827,7 @@ export function ConfiguratorStudio({
               Ориентировочно
             </div>
             <div className="font-display text-[1.2rem] leading-tight">
-              {formatRub(price.total)}
+              {price ? formatRub(price.total) : "—"}
             </div>
           </div>
           <button
@@ -751,7 +841,12 @@ export function ConfiguratorStudio({
         </div>
       </div>
 
-      <LeadModal open={leadOpen} config={config} onClose={closeLead} />
+      <LeadModal
+        open={leadOpen}
+        config={config}
+        projectId={savedProjectId}
+        onClose={closeLead}
+      />
     </div>
   );
 }

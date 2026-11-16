@@ -248,7 +248,14 @@ export function RangeField({
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
-  const change = (next: number) => onChange(clamp(Math.round(next), min, max));
+  const change = (next: number) =>
+    onChange(
+      clamp(
+        step < 1 ? Number(next.toFixed(1)) : Math.round(next),
+        min,
+        max,
+      ),
+    );
   const span = Math.max(1, max - min);
 
   return (

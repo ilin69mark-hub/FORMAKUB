@@ -18,6 +18,7 @@ import {
   ledColorHex,
 } from "@/content/lighting";
 import type { KitchenConfig, KitchenModule } from "./types";
+import type { CalculationInputs } from "./contract";
 
 /**
  * Расчёт подсветки верхнего ряда.
@@ -195,7 +196,8 @@ function countRuns(lengths: number[], maxRunM: number): number {
   return runs;
 }
 
-export function computeLighting(config: KitchenConfig): LightingPlan {
+export function computeLighting(config: KitchenConfig, _inputs?: CalculationInputs): LightingPlan {
+  void _inputs; // зарезервировано для CA-T-304/306; текущий источник — content.
   const settings = config.lighting ?? defaultKitchenLighting();
   const strip = findLedStrip(settings.powerPerMeter, settings.voltage);
   const profile = LED_PROFILES.find((item) => item.id === settings.profile)!;

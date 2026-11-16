@@ -5,6 +5,7 @@ import { validateConfig } from "./validation";
 import { canMoveKitchenModule, moveKitchenModule } from "./kitchenMove";
 import {
   SINK_RULES,
+  SINK_RULE_NAMES,
   SINK_STANDARD_SIZES,
   SINK_ROW_EDGE_BOTH,
   clampSinkWidth,
@@ -23,6 +24,7 @@ import {
   sinkRowContext,
   sectionFitsDrawers,
   sectionOuterWidth,
+  sinkRulesFromParameters,
   snapMm,
   snapSinkWidth,
 } from "./sink";
@@ -1281,11 +1283,11 @@ describe("row margins (боковые отступы по краю ряда)", (
     expect(rightAtEdge.marginRight).toBe(50);
   });
 
-  it("validateConfig — мойка 450×500 во внутреннем модуле 45 см допустима", () => {
+  it("validateConfig — мойка 450×450 во внутреннем модуле 45 см допустима", () => {
     const base = defaultKitchen();
     const innerModules: KitchenModule[] = [
       makeKitchenModule("base", { id: "b-1", width: 45 }),
-      sinkModule({ id: "s-1", width: 45, sinkWidth: 450, sinkDepth: 500 }),
+      sinkModule({ id: "s-1", width: 45, sinkWidth: 450, sinkDepth: 450 }),
       makeKitchenModule("base", { id: "b-2", width: 45 }),
       ...base.modules.filter((item) => item.type === "wall"),
     ];
@@ -1305,14 +1307,14 @@ describe("row margins (боковые отступы по краю ряда)", (
   });
 
   it("normalizeSinkModule — snap стандартного размера после зажима по ряду", () => {
-    // Стандартная 500×400 зажимается в 450 (край ряда, модуль 50 см):
-    // ближайший стандартный, который помещается, — 450×500.
+    // При утверждённой глубине корпуса 58 см стандарт 500×450
+    // зажимается до 450×450 (край ряда, модуль 50 см).
     const clamped = normalizeSinkModule(
-      sinkModule({ width: 50, sinkWidth: 500, sinkDepth: 400 }),
+      sinkModule({ width: 50, sinkWidth: 500, sinkDepth: 450 }),
       edge,
     );
     expect(clamped.sinkWidth).toBe(450);
-    expect(clamped.sinkDepth).toBe(500);
+    expect(clamped.sinkDepth).toBe(450);
 
     // Нестандартный запрос не снапится — просто зажимается.
     const custom = normalizeSinkModule(
@@ -1321,5 +1323,124 @@ describe("row margins (боковые отступы по краю ряда)", (
     );
     expect(custom.sinkWidth).toBe(450);
     expect(custom.sinkDepth).toBe(400);
+  });
+});
+
+function sinkParameterValues(): Record<string, unknown> {
+  return Object.fromEntries(
+    SINK_RULE_NAMES.map((name) => [`engine.sink.${name}`, SINK_RULES[name]]),
+  );
+}
+
+describe("CA-T-306E E2: SinkRules из CalculationInputs.parameters", () => {
+  it("полный набор 25 параметров даёт immutable SinkRules", () => {
+    expect(SINK_RULE_NAMES).toHaveLength(25);
+    const rules = sinkRulesFromParameters(sinkParameterValues());
+    expect(rules).toEqual(SINK_RULES);
+    expect(Object.isFrozen(rules)).toBe(true);
+  });
+
+  it("каждый из 25 параметров обязателен", () => {
+    for (const name of SINK_RULE_NAMES) {
+      const parameters = sinkParameterValues();
+      delete parameters[`engine.sink.${name}`];
+      expect(
+        () => sinkRulesFromParameters(parameters),
+        `engine.sink.${name}`,
+      ).toThrow(new RegExp(`отсутствует параметр engine\\.sink\\.${name}`));
+    }
+  });
+
+  it("неизвестный engine.sink.* отклоняется, прочие параметры игнорируются", () => {
+    expect(() =>
+      sinkRulesFromParameters({
+        ...sinkParameterValues(),
+        "engine.sink.unknownRule": 1,
+      }),
+    ).toThrow(/неизвестный параметр engine\.sink\.unknownRule/);
+
+    expect(() =>
+      sinkRulesFromParameters({
+        ...sinkParameterValues(),
+        "engine.supports.minLegSpacingCm": 1,
+      }),
+    ).not.toThrow();
+  });
+
+  it("неверный тип отклоняется", () => {
+    for (const [key, value] of [
+      ["engine.sink.minWidth", "40"],
+      ["engine.sink.sidePanel", null],
+      ["engine.sink.standardWidths", 40],
+      ["engine.sink.bottleBodies", [15, "20"]],
+    ] as const) {
+      expect(
+        () => sinkRulesFromParameters({ ...sinkParameterValues(), [key]: value }),
+        key,
+      ).toThrow(/ожидал/);
+    }
+  });
+
+  it("NaN и Infinity отклоняются", () => {
+    for (const [key, value] of [
+      ["engine.sink.minWidth", Number.NaN],
+      ["engine.sink.maxWidth", Number.POSITIVE_INFINITY],
+      ["engine.sink.sidePanel", Number.NEGATIVE_INFINITY],
+      ["engine.sink.standardWidths", [Number.NaN]],
+    ] as const) {
+      expect(
+        () => sinkRulesFromParameters({ ...sinkParameterValues(), [key]: value }),
+        key,
+      ).toThrow(/конечное число/);
+    }
+  });
+
+  it("отрицательные, нулевые и дробные значения по видам отклоняются", () => {
+    for (const [key, value, message] of [
+      ["engine.sink.minWidth", 0, /положительное/],
+      ["engine.sink.sidePanel", -1, /неотрицательное/],
+      ["engine.sink.maxShelvesPerSection", 1.5, /целое/],
+      ["engine.sink.maxDrawersPerSection", -1, /целое/],
+      ["engine.sink.minSinkDepth", 0, /положительное/],
+    ] as const) {
+      expect(
+        () => sinkRulesFromParameters({ ...sinkParameterValues(), [key]: value }),
+        key,
+      ).toThrow(message);
+    }
+  });
+
+  it("пустые массивы, дубликаты и нечисловые элементы отклоняются", () => {
+    for (const [key, value, message] of [
+      ["engine.sink.standardWidths", [], /непустой массив/],
+      ["engine.sink.standardWidths", [40, 40], /дубликаты/],
+      ["engine.sink.bottleBodies", [15, 15], /дубликаты/],
+      ["engine.sink.standardWidths", [0], /положительное/],
+    ] as const) {
+      expect(
+        () => sinkRulesFromParameters({ ...sinkParameterValues(), [key]: value }),
+        key,
+      ).toThrow(message);
+    }
+  });
+
+  it("взаимные ограничения проверяются", () => {
+    for (const [overrides, message] of [
+      [{ "engine.sink.minWidth": 121 }, /minWidth/],
+      [{ "engine.sink.minSinkWidth": 1200 }, /minSinkWidth/],
+      [{ "engine.sink.minSinkDepth": 501 }, /minSinkDepth/],
+      [{ "engine.sink.standardWidths": [40, 45, 50, 60, 80, 90, 100, 125] }, /вне диапазона/],
+      [{ "engine.sink.standardWidths": [40, 42] }, /не кратно widthStep/],
+      [{ "engine.sink.bottleBodies": [3.2] }, /bottleClearOffset/],
+      [{ "engine.sink.bottleClearOffset": 20 }, /bottleClearOffset/],
+    ] as const) {
+      expect(
+        () =>
+          sinkRulesFromParameters({
+            ...sinkParameterValues(),
+            ...overrides,
+          }),
+      ).toThrow(message);
+    }
   });
 });

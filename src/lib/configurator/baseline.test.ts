@@ -17,14 +17,14 @@ describe("baseline PriceBreakdown (CA-T-005)", () => {
     expect(price.currency).toBe("RUB");
     expect(price).toMatchObject({
       baseCost: 12000,
-      bodyCost: 89474,
-      frontsCost: 31916,
+      bodyCost: 80184,
+      frontsCost: 30400,
       fittingsCost: 25800,
       optionsCost: 49821,
       complexityFactor: 1.06,
-      subtotal: 221600,
+      subtotal: 210100,
       discount: 0,
-      total: 221600,
+      total: 210100,
       minOrderApplied: false,
       promo: null,
     });
@@ -37,14 +37,14 @@ describe("baseline PriceBreakdown (CA-T-005)", () => {
     expect(price.currency).toBe("RUB");
     expect(price).toMatchObject({
       baseCost: 9000,
-      bodyCost: 60941,
-      frontsCost: 73405,
-      fittingsCost: 34350,
-      optionsCost: 30390,
+      bodyCost: 36158,
+      frontsCost: 33533,
+      fittingsCost: 29050,
+      optionsCost: 20546,
       complexityFactor: 1,
-      subtotal: 208100,
+      subtotal: 128300,
       discount: 0,
-      total: 208100,
+      total: 128300,
       minOrderApplied: false,
       promo: null,
     });

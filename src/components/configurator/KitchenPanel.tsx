@@ -5,10 +5,14 @@ import { Plus, Trash2 } from "lucide-react";
 import { KITCHEN_LIMITS, KITCHEN_MODULES as MODULES } from "@/content/catalog";
 import { makeKitchenModule, normalizeKitchen } from "@/lib/configurator/defaults";
 import {
+  KITCHEN_MAX_FULL_DEPTH_CM,
+  kitchenMaxBodyDepthCm,
+} from "@/lib/configurator/geometry";
+import {
   formatRub,
   kitchenFloorModules,
   kitchenUpperModules,
-} from "@/lib/configurator/pricing";
+} from "@/lib/configurator/display";
 import type {
   KitchenConfig,
   KitchenModule,
@@ -86,21 +90,41 @@ export function KitchenPanel({
         MODULES.wall.maxHeight,
         MODULES.tall.maxHeight -
           base -
+          (config.plinth ? config.plinthHeight : 0) -
           config.countertopThickness / 10 -
           KITCHEN_LIMITS.wallGapAboveCountertop,
       ),
     );
 
-  const depthRange = (modules: KitchenModule[]) => {
-    if (modules.length === 0) return { min: 50, max: 60, value: 60 };
+  const dynamicFloorMax = kitchenMaxBodyDepthCm(config.facadeThickness);
+  const depthRange = (
+    modules: KitchenModule[],
+    maxOverride?: number,
+  ) => {
+    if (modules.length === 0) {
+      return maxOverride === undefined
+        ? { min: 30, max: 40, value: 35 }
+        : { min: 40, max: maxOverride, value: maxOverride };
+    }
+    const min = Math.max(...modules.map((module) => MODULES[module.type].minDepth));
+    const staticMax = Math.min(
+      ...modules.map((module) => MODULES[module.type].maxDepth),
+    );
+    const max = Math.min(staticMax, maxOverride ?? staticMax);
     return {
-      min: Math.max(...modules.map((module) => MODULES[module.type].minDepth)),
-      max: Math.min(...modules.map((module) => MODULES[module.type].maxDepth)),
-      value: modules[0].depth,
+      min,
+      max,
+      value: Math.min(max, Math.max(min, modules[0].depth)),
     };
   };
 
-  const floorDepth = depthRange(floor);
+  const floorHasStandardLower = floor.some(
+    (module) => module.type !== "tall" && module.type !== "oven",
+  );
+  const floorDepth = depthRange(
+    floor,
+    floorHasStandardLower ? dynamicFloorMax : undefined,
+  );
   const upperDepth = depthRange(upper);
 
   const setZoneDepth = (zone: "floor" | "upper", depth: number) => {
@@ -180,8 +204,13 @@ export function KitchenPanel({
     const zone = presetForType.zone;
     const zoneModules = zone === "upper" ? upper : floor;
     const previousDepth = zoneModules[0]?.depth ?? presetForType.defaultDepth;
+    const maxDepth =
+      zone === "floor" && presetForType.zone === "floor" &&
+      type !== "tall" && type !== "oven"
+        ? Math.min(presetForType.maxDepth, dynamicFloorMax)
+        : presetForType.maxDepth;
     const depth = Math.min(
-      presetForType.maxDepth,
+      maxDepth,
       Math.max(presetForType.minDepth, previousDepth),
     );
     const item = makeKitchenModule(type, {
@@ -376,11 +405,11 @@ export function KitchenPanel({
             {preset.zone === "floor" ? (
               <RangeField
                 label="Глубина всех модулей"
-                hint="Глубина измеряется от стены до края столешницы, стандарт столешницы 60 см, фактическая глубина модулей меньше."
+                hint={`Глубина корпуса без ХДФ и фасада. ХДФ 3 мм и фасад ${config.facadeThickness} мм добавляются отдельно; полная глубина не более ${KITCHEN_MAX_FULL_DEPTH_CM} см. Столешница 60 см даёт выступ перед фасадом не менее 2 см.`}
                 value={floorDepth.value}
                 min={floorDepth.min}
                 max={floorDepth.max}
-                step={1}
+                step={0.1}
                 markStep={5}
                 onChange={(value) => setZoneDepth("floor", value)}
               />
@@ -466,8 +495,8 @@ export function KitchenPanel({
           <RangeField
             label="Нижний ряд"
             value={floorHeight}
-            min={80}
-            max={95}
+            min={MODULES.base.minHeight}
+            max={MODULES.base.maxHeight}
             step={1}
             markStep={5}
             onChange={setBaseHeight}
